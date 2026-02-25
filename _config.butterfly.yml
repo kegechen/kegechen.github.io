@@ -1,0 +1,100 @@
+# Butterfly 主题配置
+# 更多配置请参考: https://butterfly.js.org/
+
+# 主页设置
+# --------------------------------------------------
+index_img:
+  # 顶部封面图
+  # 格式：url, link(url, link)
+  url: /img/default_top_img.jpg
+  # 居中的图标
+  icon: fas fa-home
+
+# 导航栏
+# --------------------------------------------------
+nav:
+  logo: # 可选，网站图标
+  display_title: true # 是否显示网站标题
+  fixed: true # 导航栏是否固定
+
+menu:
+  Home: / || fas fa-home
+  Archives: /archives/ || fas fa-archive
+  Tags: /tags/ || fas fa-tags
+  Categories: /categories/ || fas fa-folder-open
+  #About: /about/ || fas fa-user-circle
+
+# 侧边栏设置
+# --------------------------------------------------
+aside:
+  enable: true
+  hide: false
+  button: true
+  mobile: true # 移动端显示
+  position: right # 侧边栏位置
+  display:
+    post: true # 文章页显示
+    archive: true # 归档页显示
+    category: true # 分类页显示
+    tag: true # 标签页显示
+  card_author:
+    enable: true
+    description: 记录工作技术笔记和个人生活点滴
+    button:
+      enable: true
+      icon: fab fa-github
+      text: Github
+      link: https://github.com/kegechen
+  card_announcement:
+    enable: true
+    content: 欢迎来到我的博客！
+  card_recent_post:
+    enable: true
+    limit: 5
+    sort: date
+    show_icon: true
+  card_categories:
+    enable: true
+    limit: 8
+    expand: none
+    sort_order: count
+    show_icon: true
+  card_tags:
+    enable: true
+    limit: 20
+    order: count
+    show_icon: true
+  card_archives:
+    enable: true
+    limit: 8
+    archive_type: monthly
+    show_icon: true
+  card_webinfo:
+    enable: true
+    post_count: true
+    post_sort_order: desc
+    runtime: true
+
+# 代码块设置
+# --------------------------------------------------
+highlight_theme: mac light # 代码主题
+highlight_copy: true # 复制按钮
+highlight_lang: true # 显示语言
+highlight_height_limit: false # 代码高度限制
+highlight_shrink: false # 代码折叠
+
+# 字体设置
+# --------------------------------------------------
+font:
+  font_size: 16px
+  font_family: 'Lato, "Microsoft YaHei", sans-serif'
+  code_font_family: 'consolas, Menlo, "PingFang SC", "Microsoft YaHei", monospace'
+
+# 搜索设置
+# --------------------------------------------------
+# 注意：需要先安装 hexo-generator-searchdb
+# npm install hexo-generator-searchdb
+local_search:
+  enable: false # 暂时禁用，需要先安装插件
+  preload: false
+  CDN:
