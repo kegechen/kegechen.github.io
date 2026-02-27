@@ -1,0 +1,134 @@
+/* 简洁风格自定义样式 - 类似公众号文章风格 */
+
+/* 将蓝色主题改为黑白灰色调 */
+:root {
+  /* 按钮和链接改为深灰色，更简洁 */
+  --btn-bg: #2c3e50 !important;
+  --btn-hv-bg: #34495e !important;
+  
+  /* 高亮文本改为灰色 */
+  --text-highlight: #5a6c7d !important;
+  
+  /* 分隔线改为浅灰色 */
+  --hr-border: #e0e0e0 !important;
+  --hr-border-2: #d0d0d0 !important;
+  
+  /* 伪元素（装饰性图标等）改为浅灰色 */
+  --pseudo-element: #b0b0b0 !important;
+  
+  /* 去掉过重的阴影效果 */
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+  --hover-shadow: 0 2px 4px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* 首页样式 */
+#home_top {
+  background-color: #ffffff !important;
+}
+
+/* 文章卡片更简洁 */
+.card-widget {
+  border: 1px solid #e8e8e8 !important;
+  box-shadow: none !important;
+}
+
+.card-widget:hover {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* 导航栏更简洁 */
+#nav {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* 链接颜色改为深灰色 */
+a {
+  color: #2c3e50 !important;
+}
+
+a:hover {
+  color: #34495e !important;
+}
+
+/* 按钮更简洁 */
+.btn-beautify {
+  background-color: #f5f5f5 !important;
+  color: #333 !important;
+  border: 1px solid #ddd !important;
+}
+
+.btn-beautify:hover {
+  background-color: #e8e8e8 !important;
+}
+
+/* 标签样式更简洁 */
+.article-tag .article-meta__tag {
+  background-color: #f5f5f5 !important;
+  color: #666 !important;
+  border: 1px solid #e0e0e0 !important;
+}
+
+/* 标题颜色 */
+h1, h2, h3, h4, h5, h6 {
+  color: #333 !important;
+}
+
+/* 文章正文优化 */
+#article-container {
+  font-size: 1.05rem;
+  line-height: 1.8;
+  color: #333;
+}
+
+#article-container p {
+  margin-bottom: 1.5rem;
+}
+
+/* 去掉过多的装饰效果 */
+.article-sort-post__title {
+  font-weight: 500 !important;
+}
+
+/* 侧边栏更简洁 */
+#aside {
+  background-color: transparent !important;
+}
+
+/* 归档、分类等列表样式 */
+.archive-list-item, .category-list-item, .tag-list-item {
+  padding: 0.3rem 0 !important;
+}
+
+/* 底部更简洁 */
+#footer {
+  background-color: #f8f8f8 !important;
+}
+
+/* 阅读进度条更简洁 */
+#scroll-down {
+  display: none !important;
+}
+
+/* 去掉首页的大标题背景 */
+#page-header, .top-img {
+  min-height: auto !important;
+}
+
+/* 文章卡片布局更紧凑 */
+.recent-post-item {
+  padding: 1.2rem !important;
+  border-bottom: 1px solid #f0f0f0 !important;
+}
+
+/* 分类标签更简洁 */
+.article-meta__tags {
+  margin-left: 0.5rem !important;
+}
+
+/* 代码块边框 */
+code {
+  background-color: #f8f8f8 !important;
+  padding: 0.2rem 0.4rem !important;
+  border-radius: 3px !important;
+}

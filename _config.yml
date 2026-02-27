@@ -103,4 +103,4 @@ theme: butterfly
 deploy:
   type: git
   repo: https://github.com/kegechen/kegechen.github.io.git
-  branch: main
+  branch: gh-pages

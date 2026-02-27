@@ -1,14 +1,34 @@
 # Butterfly 主题配置
 # 更多配置请参考: https://butterfly.js.org/
 
+# 完全禁用顶部图片功能（包括全屏封面）
+# --------------------------------------------------
+disable_top_img: true
+
+# 首页封面设置（禁用空白页）
+# --------------------------------------------------
+cover:
+  index_enable: false # 禁用首页封面，直接显示文章列表
+  aside_enable: true
+  archives_enable: true
+  global_enable: false # 全局禁用封面
+
 # 主页设置
 # --------------------------------------------------
+index_site: true # 使用网站首页模式（不使用全屏封面）
+index_post_style: block # 文章列表样式
+
 index_img:
-  # 顶部封面图
-  # 格式：url, link(url, link)
-  url: /img/default_top_img.jpg
+  # 顶部封面图（已禁用）
+  url: ''
   # 居中的图标
   icon: fas fa-home
+
+# 头像设置
+# --------------------------------------------------
+avatar:
+  img: https://github.com/kegechen.png
+  effect: false
 
 # 导航栏
 # --------------------------------------------------
@@ -98,3 +118,9 @@ local_search:
   enable: false # 暂时禁用，需要先安装插件
   preload: false
   CDN:
+
+# 注入自定义样式（简洁风格）
+# --------------------------------------------------
+inject:
+  head:
+    - <link rel="stylesheet" href="/css/custom.css">
