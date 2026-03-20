@@ -1,6 +1,7 @@
 ---
 title: Cloudflare Workers 部署 VLESS 代理：从 522 报错到发现 CF 关键字扫描机制的完整调试记录
 date: 2026-03-19 18:12:00
+permalink: 2026/03/19/cf-workers-vless-debug/
 tags:
   - Cloudflare
   - Workers

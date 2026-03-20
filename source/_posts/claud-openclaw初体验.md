@@ -1,6 +1,7 @@
 ---
 title: Claude Code && OpenClaw 初体验
 date: 2026-02-25 19:30:00
+permalink: 2026/02/25/claude-openclaw-guide/
 tags:
   - OpenClaw
   - Claude
