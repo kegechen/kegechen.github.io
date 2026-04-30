@@ -1,0 +1,11 @@
+{
+  "name": "Mike's 画板",
+  "short_name": "画板",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#2d3142",
+  "description": "极简浏览器画板，支持离线使用"
+}
