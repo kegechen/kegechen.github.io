@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#2d3142">
+<link rel="manifest" href="./manifest.json">
+<title>画板 · Mike's Blog</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: #f4f5f7; color: #2d3142; }
+
+  #app { display: flex; flex-direction: column; height: 100vh; }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px;
+    padding: 10px 16px;
+    background: #ffffff;
+    border-bottom: 1px solid #e6e8ec;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    z-index: 2;
+    user-select: none;
+  }
+
+  .group { display: flex; align-items: center; gap: 8px; }
+  .group + .group { border-left: 1px solid #ececec; padding-left: 14px; }
+
+  .label { font-size: 12px; color: #8a8f99; }
+
+  .swatch {
+    width: 24px; height: 24px; border-radius: 50%;
+    border: 2px solid #ffffff;
+    box-shadow: 0 0 0 1px #d0d4dc;
+    cursor: pointer;
+    transition: transform 0.1s ease, box-shadow 0.15s ease;
+  }
+  .swatch:hover { transform: scale(1.08); }
+  .swatch.active { box-shadow: 0 0 0 2px #2d3142; transform: scale(1.1); }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px;
+    height: 32px;
+    background: #f4f5f7;
+    border: 1px solid #e0e3e9;
+    border-radius: 6px;
+    font-size: 13px; color: #2d3142;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .btn:hover { background: #ebedf1; }
+  .btn.active { background: #2d3142; color: #fff; border-color: #2d3142; }
+  .btn.danger:hover { background: #fdecec; border-color: #f5b5b5; color: #c0392b; }
+
+  .size-input { width: 90px; }
+  .size-input input[type="range"] { width: 100%; vertical-align: middle; }
+  .size-value { font-size: 12px; color: #8a8f99; min-width: 28px; text-align: right; }
+
+  .canvas-wrap {
+    flex: 1;
+    position: relative;
+    background:
+      linear-gradient(45deg, #f0f2f5 25%, transparent 25%),
+      linear-gradient(-45deg, #f0f2f5 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #f0f2f5 75%),
+      linear-gradient(-45deg, transparent 75%, #f0f2f5 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+    background-color: #ffffff;
+  }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
+  canvas.eraser-cursor { cursor: cell; }
+
+  body.immersive .toolbar { display: none; }
+  body.immersive .canvas-wrap { background-color: #ffffff; background-image: none; }
+  .exit-immersive {
+    position: fixed; top: 12px; right: 12px;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: rgba(45, 49, 66, 0.6); color: #fff;
+    border: none; cursor: pointer;
+    font-size: 18px; line-height: 36px;
+    display: none; z-index: 5;
+    transition: background 0.15s ease;
+  }
+  .exit-immersive:hover { background: rgba(45, 49, 66, 0.9); }
+  body.immersive .exit-immersive { display: block; }
+
+  .fs-overlay {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(45, 49, 66, 0.55);
+    backdrop-filter: blur(2px);
+    z-index: 10;
+  }
+  .fs-overlay.hidden { display: none; }
+  .fs-card {
+    background: #fff; border-radius: 12px;
+    padding: 28px 32px; max-width: 360px; width: calc(100% - 32px);
+    text-align: center;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+  }
+  .fs-title { font-size: 18px; font-weight: 600; color: #2d3142; margin-bottom: 8px; }
+  .fs-desc { font-size: 13px; color: #6c7280; line-height: 1.6; margin-bottom: 20px; }
+  .fs-btn {
+    display: block; width: 100%;
+    padding: 10px 16px; margin-bottom: 8px;
+    background: #2d3142; color: #fff; border: none; border-radius: 8px;
+    font-size: 14px; cursor: pointer;
+  }
+  .fs-btn:hover { background: #1f2230; }
+  .fs-skip {
+    display: block; width: 100%;
+    padding: 8px; background: transparent; border: none;
+    font-size: 12px; color: #8a8f99; cursor: pointer;
+  }
+  .fs-skip:hover { color: #2d3142; }
+
+  @media (max-width: 600px) {
+    .toolbar { padding: 8px 10px; gap: 10px; }
+    .group + .group { padding-left: 10px; }
+    .label { display: none; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="toolbar" role="toolbar" aria-label="画板工具">
+    <div class="group">
+      <button class="btn active" id="tool-pen" title="画笔">画笔</button>
+      <button class="btn" id="tool-eraser" title="橡皮擦">橡皮</button>
+    </div>
+
+    <div class="group" id="palette">
+      <span class="label">颜色</span>
+      <span class="swatch active" data-color="#2d3142" style="background:#2d3142"></span>
+      <span class="swatch" data-color="#e63946" style="background:#e63946"></span>
+      <span class="swatch" data-color="#1d8cf8" style="background:#1d8cf8"></span>
+      <span class="swatch" data-color="#2ecc71" style="background:#2ecc71"></span>
+      <span class="swatch" data-color="#f1c40f" style="background:#f1c40f"></span>
+      <span class="swatch" data-color="#9b59b6" style="background:#9b59b6"></span>
+      <span class="swatch" data-color="#ffffff" style="background:#ffffff; box-shadow:0 0 0 1px #d0d4dc"></span>
+    </div>
+
+    <div class="group">
+      <span class="label">粗细</span>
+      <div class="size-input">
+        <input type="range" id="size" min="1" max="40" value="4">
+      </div>
+      <span class="size-value" id="size-value">4</span>
+    </div>
+
+    <div class="group">
+      <button class="btn" id="fullscreen" title="全屏 (F)">全屏</button>
+      <button class="btn" id="immersive" title="沉浸模式 (I) — 隐藏工具栏">沉浸</button>
+      <button class="btn danger" id="clear" title="清空画布">一键清空</button>
+    </div>
+  </div>
+
+  <button class="exit-immersive" id="exit-immersive" title="退出沉浸模式 (I 或 Esc)" aria-label="退出沉浸模式">×</button>
+
+  <div id="fs-overlay" class="fs-overlay">
+    <div class="fs-card">
+      <div class="fs-title">沉浸画画</div>
+      <div class="fs-desc">浏览器全屏受系统限制（Kindle 可能不生效），可选择"沉浸模式"隐藏工具栏，效果更稳定。</div>
+      <button class="fs-btn" id="fs-enter">进入全屏（推荐桌面）</button>
+      <button class="fs-btn" id="fs-immersive" style="background:#5b6072">沉浸模式（推荐 Kindle）</button>
+      <button class="fs-skip" id="fs-skip">先不用</button>
+    </div>
+  </div>
+
+  <div class="canvas-wrap">
+    <canvas id="board"></canvas>
+  </div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('board');
+  const ctx = canvas.getContext('2d');
+  const wrap = canvas.parentElement;
+
+  const state = {
+    tool: 'pen',
+    color: '#2d3142',
+    size: 4,
+    drawing: false,
+    last: null,
+  };
+
+  function resize() {
+    const ratio = window.devicePixelRatio || 1;
+    const { clientWidth: w, clientHeight: h } = wrap;
+    const snapshot = canvas.width ? ctx.getImageData(0, 0, canvas.width, canvas.height) : null;
+    canvas.width = w * ratio;
+    canvas.height = h * ratio;
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    if (snapshot) {
+      const tmp = document.createElement('canvas');
+      tmp.width = snapshot.width;
+      tmp.height = snapshot.height;
+      tmp.getContext('2d').putImageData(snapshot, 0, 0);
+      ctx.drawImage(tmp, 0, 0, w, h);
+    }
+  }
+  let resizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(resize, 100);
+  });
+  resize();
+
+  function getPos(evt) {
+    const rect = canvas.getBoundingClientRect();
+    const point = evt.touches ? evt.touches[0] : evt;
+    return { x: point.clientX - rect.left, y: point.clientY - rect.top };
+  }
+
+  function start(evt) {
+    evt.preventDefault();
+    state.drawing = true;
+    state.last = getPos(evt);
+  }
+
+  function move(evt) {
+    if (!state.drawing) return;
+    evt.preventDefault();
+    const p = getPos(evt);
+    ctx.globalCompositeOperation = state.tool === 'eraser' ? 'destination-out' : 'source-over';
+    ctx.strokeStyle = state.color;
+    ctx.lineWidth = state.tool === 'eraser' ? state.size * 2.5 : state.size;
+    ctx.beginPath();
+    ctx.moveTo(state.last.x, state.last.y);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    state.last = p;
+  }
+
+  function end() { state.drawing = false; state.last = null; }
+
+  canvas.addEventListener('mousedown', start);
+  canvas.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', end);
+  canvas.addEventListener('mouseleave', end);
+  canvas.addEventListener('touchstart', start, { passive: false });
+  canvas.addEventListener('touchmove', move, { passive: false });
+  canvas.addEventListener('touchend', end);
+
+  const penBtn = document.getElementById('tool-pen');
+  const eraserBtn = document.getElementById('tool-eraser');
+  function setTool(tool) {
+    state.tool = tool;
+    penBtn.classList.toggle('active', tool === 'pen');
+    eraserBtn.classList.toggle('active', tool === 'eraser');
+    canvas.classList.toggle('eraser-cursor', tool === 'eraser');
+  }
+  penBtn.addEventListener('click', () => setTool('pen'));
+  eraserBtn.addEventListener('click', () => setTool('eraser'));
+
+  document.getElementById('palette').addEventListener('click', (e) => {
+    const sw = e.target.closest('.swatch');
+    if (!sw) return;
+    document.querySelectorAll('.swatch').forEach(el => el.classList.remove('active'));
+    sw.classList.add('active');
+    state.color = sw.dataset.color;
+    setTool('pen');
+  });
+
+  const sizeInput = document.getElementById('size');
+  const sizeValue = document.getElementById('size-value');
+  sizeInput.addEventListener('input', () => {
+    state.size = parseInt(sizeInput.value, 10);
+    sizeValue.textContent = state.size;
+  });
+
+  const fsOverlay = document.getElementById('fs-overlay');
+  const fsBtn = document.getElementById('fullscreen');
+  function enterFullscreen() {
+    const el = document.documentElement;
+    const req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+    if (req) {
+      try { req.call(el).catch(() => {}); } catch (e) { /* ignore */ }
+    }
+  }
+  function exitFullscreen() {
+    const fn = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+    if (fn) { try { fn.call(document); } catch (e) { /* ignore */ } }
+  }
+  function isFullscreen() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+  }
+  function toggleFullscreen() { isFullscreen() ? exitFullscreen() : enterFullscreen(); }
+
+  function toggleImmersive(force) {
+    const enter = typeof force === 'boolean' ? force : !document.body.classList.contains('immersive');
+    document.body.classList.toggle('immersive', enter);
+    setTimeout(resize, 50);
+  }
+
+  document.getElementById('fs-enter').addEventListener('click', () => {
+    enterFullscreen();
+    fsOverlay.classList.add('hidden');
+  });
+  document.getElementById('fs-immersive').addEventListener('click', () => {
+    toggleImmersive(true);
+    fsOverlay.classList.add('hidden');
+  });
+  document.getElementById('fs-skip').addEventListener('click', () => fsOverlay.classList.add('hidden'));
+  fsBtn.addEventListener('click', toggleFullscreen);
+  document.getElementById('immersive').addEventListener('click', () => toggleImmersive());
+  document.getElementById('exit-immersive').addEventListener('click', () => toggleImmersive(false));
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'f' || e.key === 'F') { e.preventDefault(); toggleFullscreen(); }
+    if (e.key === 'i' || e.key === 'I') { e.preventDefault(); toggleImmersive(); }
+    if (e.key === 'Escape') {
+      if (document.body.classList.contains('immersive')) toggleImmersive(false);
+      else fsOverlay.classList.add('hidden');
+    }
+  });
+
+  document.getElementById('clear').addEventListener('click', () => {
+    if (!confirm('确定要清空画布吗？此操作不可撤销。')) return;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  });
+})();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
