@@ -89,36 +89,6 @@
   .exit-immersive:hover { background: rgba(45, 49, 66, 0.9); }
   body.immersive .exit-immersive { display: block; }
 
-  .fs-overlay {
-    position: fixed; inset: 0;
-    display: flex; align-items: center; justify-content: center;
-    background: rgba(45, 49, 66, 0.55);
-    backdrop-filter: blur(2px);
-    z-index: 10;
-  }
-  .fs-overlay.hidden { display: none; }
-  .fs-card {
-    background: #fff; border-radius: 12px;
-    padding: 28px 32px; max-width: 360px; width: calc(100% - 32px);
-    text-align: center;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
-  }
-  .fs-title { font-size: 18px; font-weight: 600; color: #2d3142; margin-bottom: 8px; }
-  .fs-desc { font-size: 13px; color: #6c7280; line-height: 1.6; margin-bottom: 20px; }
-  .fs-btn {
-    display: block; width: 100%;
-    padding: 10px 16px; margin-bottom: 8px;
-    background: #2d3142; color: #fff; border: none; border-radius: 8px;
-    font-size: 14px; cursor: pointer;
-  }
-  .fs-btn:hover { background: #1f2230; }
-  .fs-skip {
-    display: block; width: 100%;
-    padding: 8px; background: transparent; border: none;
-    font-size: 12px; color: #8a8f99; cursor: pointer;
-  }
-  .fs-skip:hover { color: #2d3142; }
-
   @media (max-width: 600px) {
     .toolbar { padding: 8px 10px; gap: 10px; }
     .group + .group { padding-left: 10px; }
@@ -161,16 +131,6 @@
   </div>
 
   <button class="exit-immersive" id="exit-immersive" title="退出沉浸模式 (I 或 Esc)" aria-label="退出沉浸模式">×</button>
-
-  <div id="fs-overlay" class="fs-overlay">
-    <div class="fs-card">
-      <div class="fs-title">沉浸画画</div>
-      <div class="fs-desc">浏览器全屏受系统限制（Kindle 可能不生效），可选择"沉浸模式"隐藏工具栏，效果更稳定。</div>
-      <button class="fs-btn" id="fs-enter">进入全屏（推荐桌面）</button>
-      <button class="fs-btn" id="fs-immersive" style="background:#5b6072">沉浸模式（推荐 Kindle）</button>
-      <button class="fs-skip" id="fs-skip">先不用</button>
-    </div>
-  </div>
 
   <div class="canvas-wrap">
     <canvas id="board"></canvas>
@@ -278,7 +238,6 @@
     sizeValue.textContent = state.size;
   });
 
-  const fsOverlay = document.getElementById('fs-overlay');
   const fsBtn = document.getElementById('fullscreen');
   function enterFullscreen() {
     const el = document.documentElement;
@@ -302,15 +261,6 @@
     setTimeout(resize, 50);
   }
 
-  document.getElementById('fs-enter').addEventListener('click', () => {
-    enterFullscreen();
-    fsOverlay.classList.add('hidden');
-  });
-  document.getElementById('fs-immersive').addEventListener('click', () => {
-    toggleImmersive(true);
-    fsOverlay.classList.add('hidden');
-  });
-  document.getElementById('fs-skip').addEventListener('click', () => fsOverlay.classList.add('hidden'));
   fsBtn.addEventListener('click', toggleFullscreen);
   document.getElementById('immersive').addEventListener('click', () => toggleImmersive());
   document.getElementById('exit-immersive').addEventListener('click', () => toggleImmersive(false));
@@ -318,11 +268,10 @@
   window.addEventListener('keydown', (e) => {
     if (e.key === 'f' || e.key === 'F') { e.preventDefault(); toggleFullscreen(); }
     if (e.key === 'i' || e.key === 'I') { e.preventDefault(); toggleImmersive(); }
-    if (e.key === 'Escape') {
-      if (document.body.classList.contains('immersive')) toggleImmersive(false);
-      else fsOverlay.classList.add('hidden');
-    }
+    if (e.key === 'Escape' && document.body.classList.contains('immersive')) toggleImmersive(false);
   });
+
+  toggleImmersive(true);
 
   document.getElementById('clear').addEventListener('click', () => {
     if (!confirm('确定要清空画布吗？此操作不可撤销。')) return;

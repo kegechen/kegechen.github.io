@@ -1,4 +1,4 @@
-const CACHE = 'draw-v1';
+const CACHE = 'draw-v2';
 const ASSETS = ['./', './manifest.json'];
 
 self.addEventListener('install', (e) => {
