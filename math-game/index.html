@@ -10,6 +10,7 @@
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background: #eaf6fd; color: #234; overflow: hidden; user-select: none; }
   button { font-family: inherit; cursor: pointer; }
+  img, canvas, svg { -webkit-touch-callout: none; -webkit-user-drag: none; }  /* 禁止长按弹出保存图片、拖出图片 */
 
   /* ---------- 首页 ---------- */
   #home { height: 100%; display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 24px 16px 40px; overflow-y: auto; }
@@ -542,15 +543,24 @@ function stopVoice() {
   if (voiceAudio) { voiceAudio.pause(); voiceAudio = null; }
   if ('speechSynthesis' in window) speechSynthesis.cancel();
 }
-// 等当前这句语音读完再执行（没在播放就稍等一下）
+// 等当前这句语音结束再执行（没在播放就稍等一下）。
+// 读完、被下一句打断（pause）、播放失败（error）都算结束，再加 10 秒兜底，保证 cb 一定会执行，
+// 否则小朋友在讲解没读完时又点了别的东西，过关弹窗就永远出不来。
 function afterVoice(cb, fallbackMs = 1600) {
   const a = voiceAudio;
-  if (a && !a.paused && !a.ended) a.addEventListener('ended', () => setTimeout(cb, 300), { once: true });
-  else setTimeout(cb, fallbackMs);
+  if (!a || a.paused || a.ended) { setTimeout(cb, fallbackMs); return; }
+  let fired = false;
+  const fire = () => { if (!fired) { fired = true; setTimeout(cb, 300); } };
+  ['ended', 'pause', 'error'].forEach(ev => a.addEventListener(ev, fire, { once: true }));
+  setTimeout(fire, 10000);
 }
 function say(text) {
   stopVoice();
-  if (VOICE[text]) { voiceAudio = new Audio(VOICE[text]); voiceAudio.play().catch(() => {}); return; }
+  if (VOICE[text]) {
+    const a = voiceAudio = new Audio(VOICE[text]);
+    a.play().catch(() => a.dispatchEvent(new Event('error')));  // 播放失败也要通知 afterVoice
+    return;
+  }
   if (!('speechSynthesis' in window)) return;
   const u = new SpeechSynthesisUtterance(text);
   u.lang = 'zh-CN'; u.rate = 0.95; u.pitch = 1.15;
@@ -897,6 +907,16 @@ function initFill(lv) {
     }
   });
 }
+
+/* ================= 防误操作 =================
+ * 小朋友常误按右键：不弹菜单，右键点按钮也当作左键点（画面上的物品本来就响应任意键按下）。 */
+document.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  // 只把鼠标右键当点击；触屏长按也会触发 contextmenu，那里只拦菜单，免得和正常点击叠加成两次
+  const btn = e.target.closest('button');
+  if (btn && e.button === 2) btn.click();
+});
+document.addEventListener('dragstart', e => e.preventDefault());
 
 /* ================= 按钮 ================= */
 $('btnHome').onclick = () => { stopVoice(); $('game').style.display = 'none'; $('home').style.display = 'flex'; resizeFn = null; buildHome(); };
