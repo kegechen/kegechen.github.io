@@ -774,7 +774,7 @@ function showFinale(lv, svg) {
   const text = document.createElement('p'); text.textContent = speak;
   const again = document.createElement('button'); again.textContent = '🔊 再听一遍'; again.onclick = () => say(speak);
   const ok = document.createElement('button'); ok.className = 'primary'; ok.textContent = '我做好了！';
-  ok.onclick = () => { card.remove(); levelDone(); };
+  ok.onclick = () => { stopVoice(); card.remove(); levelDone(); };  // 不用等动作说明读完
   const btns = document.createElement('div'); btns.append(again, ok);
   card.append(cv, text, btns);
   stage.appendChild(card);
