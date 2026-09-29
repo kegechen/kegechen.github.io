@@ -1,0 +1,11 @@
+{
+  "name": "玩数学 · 配对小游戏",
+  "short_name": "玩数学",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#eaf6fd",
+  "theme_color": "#3aa0dc",
+  "description": "幼儿颜色、形状、同物品配对小游戏，支持离线使用"
+}
