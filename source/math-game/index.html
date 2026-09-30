@@ -961,8 +961,12 @@ function initFill(lv) {
 
 /* ================= 玩家、计分与排行榜 =================
  * 玩家：首次打开自动生成「头像 + 小动物名 + 数字」和随机 ID，存本机，排行榜里可改名。
- * 计分：满分 100 = 准确 60（每错一次 -10）+ 速度 30（与参考时长比）+ 独立完成 10（每重听题目一次 -5）；
- *       ≥90 三星，≥70 两星，其余一星。每关只保留最高分（同分取用时短的）。
+ * 分数（用于排名）：每关满分 1000 = 准确 600（每错一次 -100）+ 独立完成 100（每重听题目一次 -50）
+ *       + 速度 300 × min(1, 极速时长/用时)。极速时长很紧，只有特别快才接近满分，所以几乎不会同分。
+ * 星星（用于鼓励，与分数分开算，好拿）：准确 60 + 速度 30（用时在宽松的参考时长内拿满）+ 独立完成 10，
+ *       ≥90 三星，≥70 两星，其余一星。
+ * 每关只保留分数最高的一局（同分取用时短的），星星跟随那一局。
+ * 服务器（worker/worker.js）按同一公式根据用时/错误/重听自己算分和星星，改规则时两边一起改。
  * 联网：API 为空则只用本机；否则成绩先进本机待上传队列，能连上时补传，服务器同样只留最高分。 */
 const API = "https://math.ifly.qzz.io";
 
@@ -974,7 +978,6 @@ const store = {
 };
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmtTime = ms => { const s = Math.round(ms / 1000); return s < 60 ? `${s}秒` : `${Math.floor(s / 60)}分${String(s % 60).padStart(2, '0')}秒`; };
-const starsOf = score => score >= 90 ? 3 : score >= 70 ? 2 : 1;
 const starText = n => '⭐'.repeat(n);
 
 function uuid() {
@@ -1001,18 +1004,36 @@ const myLevels = () => (records[player.id] = records[player.id] || { levels: {} 
 const better = (a, b) => !b || a.score > b.score || (a.score === b.score && a.timeMs < b.timeMs);
 function bestStars(levelId) {
   const r = myLevels()[levelId];
-  return r ? `${starText(starsOf(r.score))} ${r.score}分` : '';
+  return r ? `${starText(r.stars)} ${r.score}分` : '';
 }
 
-// 参考时长（含开头听题目的时间）：用时不超过它拿满速度分，达到 3 倍为 0
-function refMs(lv) {
+// 每关的两个时长（都含开头听题目的时间）：
+//   极速时长 fast = 5 秒 + 每个配对/区域 2 秒，算排名分；参考时长 ref 宽松，算星星
+function levelTimes(lv) {
   const n = lv.type === 'match' ? Object.keys(lv.pairs).length : lv.type === 'fill' ? lv.regions.length : Object.keys(lv.balls).length;
-  return (12 + n * (lv.type === 'match' ? 8 : 5)) * 1000;
+  return { fast: (5 + n * 2) * 1000, ref: (12 + n * (lv.type === 'match' ? 8 : 5)) * 1000 };
 }
 function scoreOf(c, lv) {
-  const ref = refMs(lv), t = c.timeMs;
+  const speed = Math.round(300 * Math.min(1, levelTimes(lv).fast / Math.max(c.timeMs, 1)));
+  return Math.max(0, 600 - 100 * c.errors) + Math.max(0, 100 - 50 * c.hints) + speed;
+}
+function starsOf(c, lv) {
+  const { ref } = levelTimes(lv), t = c.timeMs;
   const speed = t <= ref ? 30 : t >= ref * 3 ? 0 : Math.round(30 * (ref * 3 - t) / (ref * 2));
-  return Math.max(0, 60 - 10 * c.errors) + speed + Math.max(0, 10 - 5 * c.hints);
+  const s = Math.max(0, 60 - 10 * c.errors) + speed + Math.max(0, 10 - 5 * c.hints);
+  return s >= 90 ? 3 : s >= 70 ? 2 : 1;
+}
+
+// 计分规则升级（v1 满分 100 → v2 满分 1000，星星单独算）：用保存的用时/错误/重听重算本机成绩
+if (store.get('mathgame-score-v', 1) < 2) {
+  for (const r of Object.values(records)) {
+    for (const [id, rec] of Object.entries(r.levels || {})) {
+      const lv = LEVELS.find(l => l.id === id);
+      if (lv) Object.assign(rec, { score: scoreOf(rec, lv), stars: starsOf(rec, lv) });
+    }
+  }
+  store.set('mathgame-records', records);
+  store.set('mathgame-score-v', 2);
 }
 
 /* ---------- 一局的统计 ---------- */
@@ -1029,13 +1050,14 @@ const session = {
     c.done = true; this.stop();
     const run = { timeMs: Math.round(c.t1 - c.t0), errors: c.errors, hints: c.hints, streak: c.maxStreak };
     run.score = scoreOf(run, c.lv);
+    run.stars = starsOf(run, c.lv);
     const levels = myLevels(), prev = levels[c.lv.id];
     const isBest = better(run, prev);
     levels[c.lv.id] = { ...(isBest ? { ...run, date: Date.now() } : prev), plays: (prev ? prev.plays : 0) + 1 };
     Object.assign(records[player.id], { name: player.name, avatar: player.avatar });
     store.set('mathgame-records', records);
     queue('/api/score', { playerId: player.id, name: player.name, avatar: player.avatar, level: c.lv.id, ...run });
-    return { ...run, stars: starsOf(run.score), isBest, hadPrev: !!prev };
+    return { ...run, isBest, hadPrev: !!prev };
   },
 };
 
@@ -1090,12 +1112,12 @@ async function fetchBoard(level) {
 function localBoard(level) {
   const rows = Object.entries(records).filter(([, r]) => r.name).map(([id, r]) => ({ id, name: r.name, avatar: r.avatar, levels: r.levels }));
   if (level) {
-    return rows.filter(r => r.levels[level]).map(r => ({ ...r, ...r.levels[level], stars: starsOf(r.levels[level].score) }))
+    return rows.filter(r => r.levels[level]).map(r => ({ ...r, ...r.levels[level] }))
       .sort((a, b) => b.score - a.score || a.timeMs - b.timeMs);
   }
   return rows.map(r => {
     const ls = Object.values(r.levels);
-    return { ...r, total: ls.reduce((s, x) => s + x.score, 0), stars: ls.reduce((s, x) => s + starsOf(x.score), 0),
+    return { ...r, total: ls.reduce((s, x) => s + x.score, 0), stars: ls.reduce((s, x) => s + x.stars, 0),
              levels: ls.length, timeMs: ls.reduce((s, x) => s + x.timeMs, 0) };
   }).filter(r => r.levels).sort((a, b) => b.total - a.total || a.timeMs - b.timeMs);
 }
@@ -1119,7 +1141,7 @@ async function renderBoard() {
     const mine = myLevels();
     body.innerHTML = table(['关卡', '最高分', '星星', '用时', '错误', '最长连对', '玩了几次'], LEVELS.map(lv => {
       const r = mine[lv.id];
-      return r ? `<tr><td class="name">${esc(lv.title)}</td><td><b>${r.score}</b></td><td>${starText(starsOf(r.score))}</td><td>${fmtTime(r.timeMs)}</td><td>${r.errors}</td><td>${r.streak}</td><td>${r.plays}</td></tr>`
+      return r ? `<tr><td class="name">${esc(lv.title)}</td><td><b>${r.score}</b></td><td>${starText(r.stars)}</td><td>${fmtTime(r.timeMs)}</td><td>${r.errors}</td><td>${r.streak}</td><td>${r.plays}</td></tr>`
                : `<tr><td class="name">${esc(lv.title)}</td><td colspan="6" style="color:#bbb">还没玩</td></tr>`;
     }));
     return;
