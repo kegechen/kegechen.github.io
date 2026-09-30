@@ -74,6 +74,33 @@
   .finale button { margin: 4px 6px; border: none; border-radius: 24px; padding: 10px 18px; font-size: clamp(14px, 1.6vw, 18px); font-weight: bold; background: #e3f2fd; color: #1e88c8; }
   .finale button.primary { background: #43a047; color: #fff; }
 
+  /* ---------- 排行榜 ---------- */
+  #btnBoard { position: fixed; top: 10px; right: 12px; z-index: 5; border: none; background: rgba(255,255,255,.6); border-radius: 50%;
+              width: 40px; height: 40px; font-size: 20px; opacity: .45; transition: opacity .2s; }
+  #btnBoard:hover { opacity: 1; }
+  #board { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; z-index: 12; }
+  #board .panel { width: min(760px, 94vw); height: min(620px, 90vh); background: #fff; border-radius: 20px; display: flex; flex-direction: column; overflow: hidden; animation: pop .3s; }
+  .board-head { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: #3aa0dc; color: #fff; flex-wrap: wrap; }
+  .board-head .me { font-size: 18px; font-weight: bold; display: flex; align-items: center; gap: 6px; }
+  .board-head .me button, #btnBoardClose { border: none; background: rgba(255,255,255,.25); color: #fff; border-radius: 16px; padding: 4px 10px; font-size: 15px; }
+  #btnBoardClose { margin-left: auto; }
+  .tabs { display: flex; gap: 6px; }
+  .tabs button { border: none; border-radius: 16px; padding: 6px 14px; font-size: 15px; font-weight: bold; background: rgba(255,255,255,.25); color: #fff; }
+  .tabs button.on { background: #fff; color: #1e88c8; }
+  .board-bar { display: flex; align-items: center; gap: 10px; padding: 8px 16px; font-size: 13px; color: #789; min-height: 40px; }
+  .board-bar select { font-size: 15px; padding: 4px 8px; border-radius: 8px; border: 1px solid #bcd; }
+  .board-body { flex: 1; overflow-y: auto; padding: 0 16px 16px; }
+  .board-body table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  .board-body th { position: sticky; top: 0; background: #f0f7fc; color: #567; font-weight: normal; font-size: 13px; padding: 6px 4px; text-align: center; }
+  .board-body td { padding: 7px 4px; border-bottom: 1px solid #eef3f7; text-align: center; white-space: nowrap; }
+  .board-body td.name { text-align: left; }
+  .board-body tr.me td { background: #fff8e1; font-weight: bold; }
+  .board-body .rank1 { color: #f5a623; font-weight: bold; } .board-body .rank2 { color: #9aa5b1; font-weight: bold; } .board-body .rank3 { color: #c47a3a; font-weight: bold; }
+  .board-empty { text-align: center; color: #9ab; padding: 40px 0; }
+  .card .best { font-size: 14px; color: #f5a623; min-height: 18px; }
+  .win-stats { margin: -10px 0 18px; font-size: 16px; color: #567; }
+  .win-stats b { color: #e65100; }
+
   /* ---------- 过关 ---------- */
   #win { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; z-index: 10; }
   #win .box { background: #fff; border-radius: 24px; padding: 28px 40px; text-align: center; animation: pop .4s; }
@@ -100,6 +127,7 @@
 <body>
 
 <div id="home">
+  <button id="btnBoard" title="排行榜">🏆</button>
   <h1>玩<span>数</span>学 · 配对小游戏</h1>
   <div id="cards" style="display:contents"></div>
 </div>
@@ -115,10 +143,29 @@
   <div class="main" id="main"></div>
 </div>
 
+<div id="board">
+  <div class="panel">
+    <div class="board-head">
+      <div class="me"><span id="meAvatar"></span><span id="meName"></span><button id="btnRename" title="改名">✏️</button></div>
+      <div class="tabs">
+        <button data-tab="total" class="on">总榜</button><button data-tab="level">单关榜</button><button data-tab="mine">我的成绩</button>
+      </div>
+      <button id="btnBoardClose" title="关闭">✕</button>
+    </div>
+    <div class="board-bar">
+      <select id="boardLevel"></select>
+      <span id="boardSrc"></span>
+    </div>
+    <div class="board-body" id="boardBody"></div>
+  </div>
+</div>
+
 <div id="win">
   <div class="box">
-    <div class="stars">⭐⭐⭐</div>
+    <div class="stars" id="winStars">⭐⭐⭐</div>
     <h2 id="winText"></h2>
+    <div class="win-stats" id="winStats"></div>
+    <button id="btnWinHome">🏠 首页</button>
     <button id="btnAgain">再玩一次</button>
     <button id="btnNext">下一关 →</button>
   </div>
@@ -591,8 +638,8 @@ function hint(text, good = false) {
   clearTimeout(hintTimer); hintTimer = setTimeout(() => hintEl.classList.remove('show'), 1200 + text.length * 180);
 }
 // 答对：说讲解；答错：说引导（具体引导优先，其次本关通用引导）
-function praise(teach) { const t = teach || pick(PRAISE); sfx.ok(); hint(t, true); say(t); }
-function retry(lv, specific) { const t = specific || lv.hint || pick(RETRY[lv.cat]); sfx.bad(); hint(t); say(t); }
+function praise(teach) { const t = teach || pick(PRAISE); sfx.ok(); hint(t, true); say(t); session.ok(); }
+function retry(lv, specific) { const t = specific || lv.hint || pick(RETRY[lv.cat]); sfx.bad(); hint(t); say(t); session.error(); }
 
 function fitStage(w, h) {
   // 让舞台在剩余空间里按原图比例尽量放大
@@ -618,7 +665,7 @@ function buildHome() {
       if (lv.cat !== cat) return;
       const c = document.createElement('button');
       c.className = 'card' + (cleared.has(lv.id) ? ' cleared' : '');
-      c.innerHTML = `<div class="done">🏅</div><img src="${IMG[lv.img]}"><div class="name">${lv.title}</div><div class="tag">${CATS[cat]} · ${lv.tag}</div>`;
+      c.innerHTML = `<div class="done">🏅</div><img src="${IMG[lv.img]}"><div class="name">${lv.title}</div><div class="tag">${CATS[cat]} · ${lv.tag}</div><div class="best">${bestStars(lv.id)}</div>`;
       c.onclick = () => startLevel(i);
       box.appendChild(c);
     });
@@ -638,14 +685,17 @@ function startLevel(i) {
   stage.appendChild(hintEl);
   fitStage(lv.w, lv.h);
   say(lv.desc);
+  session.start(lv);
 }
 
 function levelDone() {
   const lv = LEVELS[cur];
   cleared.add(lv.id); localStorage.setItem('mathgame-cleared', JSON.stringify([...cleared]));
+  const result = session.finish();  // 结尾任务（自己做动作）不计时，在 showFinale 时已停表
   afterVoice(() => {
     const text = lv.winText || WIN_TEXT;
     $('winText').textContent = text; sfx.win(); say(text);
+    showResult(result);
     $('btnNext').style.display = cur < LEVELS.length - 1 ? '' : 'none';
     $('win').style.display = 'flex';
     const colors = CRAYONS.map(c => c.color);
@@ -755,6 +805,7 @@ function initCompare(lv) {
 function showFinale(lv, svg) {
   const { key, speak } = lv.finale;
   hintEl.classList.remove('show');
+  session.stop();
   const [x1, y1, x2, y2] = lv.b[key] || lv.a[key];
   const pad = 14;
   // 带洞的遮罩 + 闪烁的金框
@@ -908,6 +959,207 @@ function initFill(lv) {
   });
 }
 
+/* ================= 玩家、计分与排行榜 =================
+ * 玩家：首次打开自动生成「头像 + 小动物名 + 数字」和随机 ID，存本机，排行榜里可改名。
+ * 计分：满分 100 = 准确 60（每错一次 -10）+ 速度 30（与参考时长比）+ 独立完成 10（每重听题目一次 -5）；
+ *       ≥90 三星，≥70 两星，其余一星。每关只保留最高分（同分取用时短的）。
+ * 联网：API 为空则只用本机；否则成绩先进本机待上传队列，能连上时补传，服务器同样只留最高分。 */
+const API = "https://math.ifly.qzz.io";
+
+const ANIMALS = [['🐼', '小熊猫'], ['🐰', '小兔子'], ['🦊', '小狐狸'], ['🐯', '小老虎'], ['🐱', '小猫咪'], ['🐶', '小狗狗'],
+                 ['🐧', '小企鹅'], ['🐵', '小猴子'], ['🐸', '小青蛙'], ['🐻', '小熊'], ['🐨', '小考拉'], ['🦁', '小狮子']];
+const store = {
+  get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } },
+  set: (k, v) => localStorage.setItem(k, JSON.stringify(v)),
+};
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmtTime = ms => { const s = Math.round(ms / 1000); return s < 60 ? `${s}秒` : `${Math.floor(s / 60)}分${String(s % 60).padStart(2, '0')}秒`; };
+const starsOf = score => score >= 90 ? 3 : score >= 70 ? 2 : 1;
+const starText = n => '⭐'.repeat(n);
+
+function uuid() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128;
+  const h = [...b].map(x => x.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+const player = (() => {
+  let p = store.get('mathgame-player', null);
+  if (!p || !p.id) {
+    const [avatar, animal] = pick(ANIMALS);
+    p = { id: uuid(), name: animal + (10 + Math.floor(Math.random() * 90)), avatar };
+    store.set('mathgame-player', p);
+  }
+  return p;
+})();
+
+// 本机成绩：{ 玩家ID: { name, avatar, levels: { 关卡ID: { score, timeMs, errors, hints, streak, plays, date } } } }
+const records = store.get('mathgame-records', {});
+const myLevels = () => (records[player.id] = records[player.id] || { levels: {} }).levels;
+const better = (a, b) => !b || a.score > b.score || (a.score === b.score && a.timeMs < b.timeMs);
+function bestStars(levelId) {
+  const r = myLevels()[levelId];
+  return r ? `${starText(starsOf(r.score))} ${r.score}分` : '';
+}
+
+// 参考时长（含开头听题目的时间）：用时不超过它拿满速度分，达到 3 倍为 0
+function refMs(lv) {
+  const n = lv.type === 'match' ? Object.keys(lv.pairs).length : lv.type === 'fill' ? lv.regions.length : Object.keys(lv.balls).length;
+  return (12 + n * (lv.type === 'match' ? 8 : 5)) * 1000;
+}
+function scoreOf(c, lv) {
+  const ref = refMs(lv), t = c.timeMs;
+  const speed = t <= ref ? 30 : t >= ref * 3 ? 0 : Math.round(30 * (ref * 3 - t) / (ref * 2));
+  return Math.max(0, 60 - 10 * c.errors) + speed + Math.max(0, 10 - 5 * c.hints);
+}
+
+/* ---------- 一局的统计 ---------- */
+const session = {
+  c: null,
+  start(lv) { this.c = { lv, t0: performance.now(), t1: 0, errors: 0, hints: 0, streak: 0, maxStreak: 0, done: false }; },
+  ok() { const c = this.c; if (c) { c.streak++; c.maxStreak = Math.max(c.maxStreak, c.streak); } },
+  error() { if (this.c) { this.c.errors++; this.c.streak = 0; } },
+  hint() { if (this.c) this.c.hints++; },
+  stop() { if (this.c && !this.c.t1) this.c.t1 = performance.now(); },
+  finish() {
+    const c = this.c;
+    if (!c || c.done) return null;
+    c.done = true; this.stop();
+    const run = { timeMs: Math.round(c.t1 - c.t0), errors: c.errors, hints: c.hints, streak: c.maxStreak };
+    run.score = scoreOf(run, c.lv);
+    const levels = myLevels(), prev = levels[c.lv.id];
+    const isBest = better(run, prev);
+    levels[c.lv.id] = { ...(isBest ? { ...run, date: Date.now() } : prev), plays: (prev ? prev.plays : 0) + 1 };
+    Object.assign(records[player.id], { name: player.name, avatar: player.avatar });
+    store.set('mathgame-records', records);
+    queue('/api/score', { playerId: player.id, name: player.name, avatar: player.avatar, level: c.lv.id, ...run });
+    return { ...run, stars: starsOf(run.score), isBest, hadPrev: !!prev };
+  },
+};
+
+function showResult(r) {
+  if (!r) return;
+  $('winStars').innerHTML = starText(r.stars) + `<span style="opacity:.2">${starText(3 - r.stars)}</span>`;
+  $('winStats').innerHTML = `得分 <b>${r.score}</b> · 用时 ${fmtTime(r.timeMs)} · 错 ${r.errors} 次`
+    + (r.isBest && r.hadPrev ? ' · 🎉 新纪录！' : '');
+}
+
+/* ---------- 上传队列：离线时攒着，联网后补传 ---------- */
+function queue(path, body) {
+  if (!API) return;
+  const box = store.get('mathgame-outbox', []);
+  box.push({ path, body });
+  store.set('mathgame-outbox', box.slice(-200));
+  flush();
+}
+let flushing = null;
+function flush() {
+  if (!API || flushing) return flushing || Promise.resolve();
+  flushing = (async () => {
+    let box = store.get('mathgame-outbox', []);
+    while (box.length) {
+      try {
+        const res = await fetch(API + box[0].path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(box[0].body) });
+        if (res.status >= 500) break;           // 服务器出错，下次再试
+      } catch (e) { break; }                    // 网络不通，下次再试
+      box = store.get('mathgame-outbox', []).slice(1);  // 成功或数据被拒（4xx）都移出队列
+      store.set('mathgame-outbox', box);
+    }
+  })().finally(() => { flushing = null; });
+  return flushing;
+}
+window.addEventListener('online', flush);
+flush();
+
+/* ---------- 排行榜面板 ---------- */
+let boardTab = 'total';
+
+async function fetchBoard(level) {
+  if (!API) return null;
+  await flush();
+  const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 5000);
+  try {
+    const res = await fetch(`${API}/api/board${level ? '?level=' + encodeURIComponent(level) : ''}`, { signal: ctl.signal });
+    return res.ok ? (await res.json()).rows : null;
+  } catch (e) { return null; } finally { clearTimeout(timer); }
+}
+
+// 本机的榜单：用本机所有玩家的最好成绩
+function localBoard(level) {
+  const rows = Object.entries(records).filter(([, r]) => r.name).map(([id, r]) => ({ id, name: r.name, avatar: r.avatar, levels: r.levels }));
+  if (level) {
+    return rows.filter(r => r.levels[level]).map(r => ({ ...r, ...r.levels[level], stars: starsOf(r.levels[level].score) }))
+      .sort((a, b) => b.score - a.score || a.timeMs - b.timeMs);
+  }
+  return rows.map(r => {
+    const ls = Object.values(r.levels);
+    return { ...r, total: ls.reduce((s, x) => s + x.score, 0), stars: ls.reduce((s, x) => s + starsOf(x.score), 0),
+             levels: ls.length, timeMs: ls.reduce((s, x) => s + x.timeMs, 0) };
+  }).filter(r => r.levels).sort((a, b) => b.total - a.total || a.timeMs - b.timeMs);
+}
+
+function table(head, rows) {
+  if (!rows.length) return '<div class="board-empty">还没有成绩，快去玩一关吧！</div>';
+  return `<table><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr>${rows.join('')}</table>`;
+}
+const rankCell = i => `<td class="rank${i + 1}">${i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1}</td>`;
+const nameCell = r => `<td class="name">${esc(r.avatar)} ${esc(r.name)}${r.id === player.id ? '（我）' : ''}</td>`;
+const rowTag = r => `<tr${r.id === player.id ? ' class="me"' : ''}>`;
+
+async function renderBoard() {
+  const body = $('boardBody'), sel = $('boardLevel'), src = $('boardSrc');
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === boardTab));
+  sel.style.display = boardTab === 'level' ? '' : 'none';
+  $('meAvatar').textContent = player.avatar; $('meName').textContent = player.name;
+
+  if (boardTab === 'mine') {
+    src.textContent = '📱 本机记录，每关只留最高分';
+    const mine = myLevels();
+    body.innerHTML = table(['关卡', '最高分', '星星', '用时', '错误', '最长连对', '玩了几次'], LEVELS.map(lv => {
+      const r = mine[lv.id];
+      return r ? `<tr><td class="name">${esc(lv.title)}</td><td><b>${r.score}</b></td><td>${starText(starsOf(r.score))}</td><td>${fmtTime(r.timeMs)}</td><td>${r.errors}</td><td>${r.streak}</td><td>${r.plays}</td></tr>`
+               : `<tr><td class="name">${esc(lv.title)}</td><td colspan="6" style="color:#bbb">还没玩</td></tr>`;
+    }));
+    return;
+  }
+
+  const level = boardTab === 'level' ? sel.value : null;
+  body.innerHTML = '<div class="board-empty">加载中…</div>';
+  const online = await fetchBoard(level);
+  if (boardTab !== (level ? 'level' : 'total') || (level && level !== sel.value)) return;  // 等待期间切换了标签
+  const rows = online || localBoard(level);
+  src.textContent = online ? '🌐 所有玩家' : API ? '📱 连不上排行榜服务器，先显示本机成绩' : '📱 本机成绩';
+  body.innerHTML = level
+    ? table(['名次', '玩家', '得分', '星星', '用时', '错误'], rows.map((r, i) =>
+        `${rowTag(r)}${rankCell(i)}${nameCell(r)}<td><b>${r.score}</b></td><td>${starText(r.stars)}</td><td>${fmtTime(r.timeMs)}</td><td>${r.errors}</td></tr>`))
+    : table(['名次', '玩家', '总分', '星星', '通关', '总用时'], rows.map((r, i) =>
+        `${rowTag(r)}${rankCell(i)}${nameCell(r)}<td><b>${r.total}</b></td><td>⭐×${r.stars}</td><td>${r.levels}/${LEVELS.length}</td><td>${fmtTime(r.timeMs)}</td></tr>`));
+}
+
+function openBoard() {
+  const sel = $('boardLevel');
+  if (!sel.options.length) sel.innerHTML = LEVELS.map(lv => `<option value="${lv.id}">${esc(lv.title)}</option>`).join('');
+  $('board').style.display = 'flex';
+  renderBoard();
+}
+
+$('btnBoard').onclick = openBoard;
+$('btnBoardClose').onclick = () => { $('board').style.display = 'none'; };
+$('board').addEventListener('pointerdown', e => { if (e.target.id === 'board') $('board').style.display = 'none'; });
+$('boardLevel').onchange = renderBoard;
+document.querySelectorAll('.tabs button').forEach(b => { b.onclick = () => { boardTab = b.dataset.tab; renderBoard(); }; });
+$('btnRename').onclick = () => {
+  const name = (prompt('给自己起个名字吧（最多 12 个字）', player.name) || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 12);
+  if (!name || name === player.name) return;
+  player.name = name; store.set('mathgame-player', player);
+  if (records[player.id]) { records[player.id].name = name; store.set('mathgame-records', records); }
+  queue('/api/player', { playerId: player.id, name: player.name, avatar: player.avatar });
+  renderBoard();
+};
+
+
 /* ================= 防误操作 =================
  * 小朋友常误按右键：不弹菜单，右键点按钮也当作左键点（画面上的物品本来就响应任意键按下）。 */
 document.addEventListener('contextmenu', e => {
@@ -919,8 +1171,9 @@ document.addEventListener('contextmenu', e => {
 document.addEventListener('dragstart', e => e.preventDefault());
 
 /* ================= 按钮 ================= */
-$('btnHome').onclick = () => { stopVoice(); $('game').style.display = 'none'; $('home').style.display = 'flex'; resizeFn = null; buildHome(); };
-$('btnSpeak').onclick = () => say(LEVELS[cur].desc);
+$('btnHome').onclick = () => { stopVoice(); $('win').style.display = 'none'; $('game').style.display = 'none'; $('home').style.display = 'flex'; resizeFn = null; buildHome(); };
+$('btnWinHome').onclick = () => $('btnHome').click();
+$('btnSpeak').onclick = () => { say(LEVELS[cur].desc); session.hint(); };
 $('btnReset').onclick = () => startLevel(cur);
 $('btnAgain').onclick = () => startLevel(cur);
 $('btnNext').onclick = () => startLevel(cur + 1);
