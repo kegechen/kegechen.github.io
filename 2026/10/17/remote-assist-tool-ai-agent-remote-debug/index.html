@@ -1,0 +1,383 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>不装 SSH，让 AI agent 直接上手调试远端机器：remote-assist-tool 半年开发记 | Mike's Blog</title><meta name="author" content="Mike"><meta name="copyright" content="Mike"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="远端是一台 Windows（或 Linux），藏在 NAT 后面，没开 SSH，也不想为它开 SSH。我想要的是：对方跑一条命令，把屏幕上那段话复制给我本地的 AI 助手——Claude Code、Codex、豆包都行，只要支持 MCP——它就能在那台机器上执行命令、读写文件、翻日志、传安装包。 从 2026 年 3 月到 10 月，这个想法长成了 remote-assist-tool：177">
+<meta property="og:type" content="article">
+<meta property="og:title" content="不装 SSH，让 AI agent 直接上手调试远端机器：remote-assist-tool 半年开发记">
+<meta property="og:url" content="https://kegechen.github.io/2026/10/17/remote-assist-tool-ai-agent-remote-debug/index.html">
+<meta property="og:site_name" content="Mike&#39;s Blog">
+<meta property="og:description" content="远端是一台 Windows（或 Linux），藏在 NAT 后面，没开 SSH，也不想为它开 SSH。我想要的是：对方跑一条命令，把屏幕上那段话复制给我本地的 AI 助手——Claude Code、Codex、豆包都行，只要支持 MCP——它就能在那台机器上执行命令、读写文件、翻日志、传安装包。 从 2026 年 3 月到 10 月，这个想法长成了 remote-assist-tool：177">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://github.com/kegechen.png">
+<meta property="article:published_time" content="2026-10-17T14:30:00.000Z">
+<meta property="article:modified_time" content="2026-10-17T14:28:33.748Z">
+<meta property="article:author" content="Mike">
+<meta property="article:tag" content="AI Agent">
+<meta property="article:tag" content="Claude Code">
+<meta property="article:tag" content="Go">
+<meta property="article:tag" content="MCP">
+<meta property="article:tag" content="NAT 穿透">
+<meta property="article:tag" content="P2P">
+<meta property="article:tag" content="remote-assist-tool">
+<meta property="article:tag" content="安全">
+<meta property="article:tag" content="远程调试">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://github.com/kegechen.png"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "不装 SSH，让 AI agent 直接上手调试远端机器：remote-assist-tool 半年开发记",
+  "url": "https://kegechen.github.io/2026/10/17/remote-assist-tool-ai-agent-remote-debug/",
+  "image": "https://github.com/kegechen.png",
+  "datePublished": "2026-10-17T14:30:00.000Z",
+  "dateModified": "2026-10-17T14:28:33.748Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "Mike",
+      "url": "https://kegechen.github.io"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/favicon.png"><link rel="canonical" href="https://kegechen.github.io/2026/10/17/remote-assist-tool-ai-agent-remote-debug/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css?v=5.5.4"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.1.0/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        if (!ttl) return
+        const expiry = Date.now() + ttl * 86400000
+        localStorage.setItem(key, JSON.stringify({ value, expiry }))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return undefined
+        const { value, expiry } = JSON.parse(itemStr)
+        if (Date.now() > expiry) {
+          localStorage.removeItem(key)
+          return undefined
+        }
+        return value
+      }
+    }
+
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        Object.entries(attr).forEach(([key, val]) => script.setAttribute(key, val))
+        script.onload = script.onreadystatechange = () => {
+          if (!script.readyState || /loaded|complete/.test(script.readyState)) resolve()
+        }
+        script.onerror = reject
+        document.head.appendChild(script)
+      }),
+      getCSS: (url, id) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onload = link.onreadystatechange = () => {
+          if (!link.readyState || /loaded|complete/.test(link.readyState)) resolve()
+        }
+        link.onerror = reject
+        document.head.appendChild(link)
+      }),
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
+
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
+        
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
+    
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":false},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.13.0/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '不装 SSH，让 AI agent 直接上手调试远端机器：remote-assist-tool 半年开发记',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><link rel="stylesheet" href="/css/custom.css"><meta name="generator" content="Hexo 8.1.1"></head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="https://github.com/kegechen.png" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="site-data text-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">5</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">28</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> Home</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> Archives</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> Tags</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> Categories</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="not-top-img fixed" id="page-header"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><span class="site-name">Mike's Blog</span></a><a class="nav-page-title" href="/"><span class="site-name">不装 SSH，让 AI agent 直接上手调试远端机器：remote-assist-tool 半年开发记</span><span class="site-name"><i class="fa-solid fa-circle-arrow-left"></i><span>  返回首页</span></span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> Home</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> Archives</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> Tags</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> Categories</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav></header><main class="layout" id="content-inner"><div id="post"><div id="post-info"><h1 class="post-title">不装 SSH，让 AI agent 直接上手调试远端机器：remote-assist-tool 半年开发记</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-10-17T14:30:00.000Z" title="发表于 2026-10-17 22:30:00">2026-10-17</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-10-17T14:28:33.748Z" title="更新于 2026-10-17 22:28:33">2026-10-17</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/">技术笔记</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title=""><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">浏览量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div><article class="container post-content" id="article-container"><blockquote>
+<p>远端是一台 Windows（或 Linux），藏在 NAT 后面，没开 SSH，也不想为它开 SSH。我想要的是：对方跑一条命令，把屏幕上那段话复制给我本地的 AI 助手——Claude Code、Codex、豆包都行，只要支持 MCP——它就能在那台机器上执行命令、读写文件、翻日志、传安装包。</p>
+<p>从 2026 年 3 月到 10 月，这个想法长成了 <a target="_blank" rel="noopener" href="https://github.com/kegechen/remote-assist-tool">remote-assist-tool</a>：177 个提交、约 5.4 万行 Go（其中测试 1.7 万行）。本文按时间线讲它想解决什么、中间踩过哪些坑、为什么改成现在这样，以及它能做什么、做不到什么。</p>
+</blockquote>
+<span id="more"></span>
+
+<h2 id="一、要解决的问题"><a href="#一、要解决的问题" class="headerlink" title="一、要解决的问题"></a>一、要解决的问题</h2><h3 id="1-1-场景"><a href="#1-1-场景" class="headerlink" title="1.1 场景"></a>1.1 场景</h3><p>我日常要协助排查的机器大致有三类：</p>
+<ul>
+<li>同事或现场的 Windows 电脑：装了一堆业务软件，出问题时要看日志、查进程、替换个 DLL；</li>
+<li>局域网里的 Linux &#x2F; ARM64 小机器：开发板、测试机；</li>
+<li>跨网络的机器：在别人的 NAT 后面，没有公网 IP。</li>
+</ul>
+<p>传统做法是远程桌面（向日葵、TeamViewer、RDP）加人肉操作。2026 年我的工作方式已经变成”大部分排查让 AI agent 动手”（我自己主要用 Claude Code），远程桌面对 AI 并不友好：它要的是结构化的命令执行和文件读写，而不是一个视频流。</p>
+<h3 id="1-2-为什么不直接用-SSH"><a href="#1-2-为什么不直接用-SSH" class="headerlink" title="1.2 为什么不直接用 SSH"></a>1.2 为什么不直接用 SSH</h3><p>SSH 是这类需求的标准答案，AI agent 也能直接通过 <code>ssh host cmd</code> 干活。问题出在远端是 Windows 的时候：</p>
+<table>
+<thead>
+<tr>
+<th>环节</th>
+<th>在 Windows 上的实际体验</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>安装 sshd</td>
+<td>OpenSSH Server 是”可选功能”，要管理员权限；内网机器常常装不上（Windows Update &#x2F; FoD 源不可达）</td>
+</tr>
+<tr>
+<td>启动与防火墙</td>
+<td>要手动把服务设成自启、放行 22 端口，有的机器还有组策略或安全软件拦着</td>
+</tr>
+<tr>
+<td>密钥登录</td>
+<td>管理员账号的公钥要放 <code>administrators_authorized_keys</code>，ACL 权限不对就静默失败</td>
+</tr>
+<tr>
+<td>默认 shell</td>
+<td>进去是 <code>cmd.exe</code>，中文输出是 GBK，引号转义规则和 POSIX 完全不同</td>
+</tr>
+<tr>
+<td>网络可达</td>
+<td>机器在 NAT 后面，还得再配端口映射、frp 或者 VPN</td>
+</tr>
+<tr>
+<td>对方的心理负担</td>
+<td>“帮我开一下 SSH 服务、开一下防火墙”，对非开发同事来说这句话很难执行</td>
+</tr>
+</tbody></table>
+<p>这里面每一项单独看都能解决，但叠在一起，每次协助前都要先花半小时”让对方配环境”，而且装上的 sshd 是常驻服务，协助完还得记得关。</p>
+<p>所以目标很明确：<strong>被协助端零配置、免安装、不需要管理员权限、不开监听端口、能穿 NAT；协助端能让 AI 直接用。</strong></p>
+<h2 id="二、现在长什么样"><a href="#二、现在长什么样" class="headerlink" title="二、现在长什么样"></a>二、现在长什么样</h2><p>一共三个角色：</p>
+<p><img src="/img/remote-assist-tool/architecture.svg" alt="remote-assist-tool 架构"></p>
+<ul>
+<li><strong>share</strong>：被协助端跑 <code>remote share</code>（Windows 下双击 exe 也行），向 relay 注册，拿到协助码，然后把一整段”可以直接贴给 AI”的协助文案复制到剪贴板；</li>
+<li><strong>help</strong>：协助端把 <code>remote help --mcp-stdio</code> 配成 AI agent 的 MCP server，agent 调 <code>connect(code, server)</code> 就配对成功。它是标准的 stdio MCP server，不绑定任何一家：Claude Code、Codex、豆包等支持 MCP 的 agent 都能接；</li>
+<li><strong>relay</strong>：中转服务器，负责发协助码、转发消息，并辅助 P2P 打洞。</li>
+</ul>
+<p>关于 relay 怎么选，有三种用法：</p>
+<table>
+<thead>
+<tr>
+<th>用法</th>
+<th>什么时候用</th>
+<th>怎么做</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>默认公共 relay</td>
+<td>开箱即用，大多数情况</td>
+<td>什么都不用配。客户端内置了一台部署在<strong>海外</strong>的公共 relay</td>
+</tr>
+<tr>
+<td>自建 relay</td>
+<td>默认 relay 连不上或太慢；或者不想把信任交给别人的服务器</td>
+<td>从 <a target="_blank" rel="noopener" href="https://github.com/kegechen/remote-assist-tool/releases/latest">GitHub Release</a> 下载 <code>remote-assist-relay-&lt;os&gt;-&lt;arch&gt;</code>，在两端都能访问的机器上运行并放行 TCP 8443，两端用 <code>--server</code> 或环境变量 <code>REMOTE_RELAY_SERVER</code> 指向它</td>
+</tr>
+<tr>
+<td><code>--standalone</code></td>
+<td>两端在同一个局域网</td>
+<td><code>remote share --standalone</code>，relay 直接内嵌在 share 进程里，不依赖任何外部服务</td>
+</tr>
+</tbody></table>
+<p>Release 里 Windows &#x2F; Linux &#x2F; macOS 的 amd64、arm64 都有现成的 cli、relay 和 webui，另外还有一键安装脚本，下载后会用 <code>SHA256SUMS</code> 校验。</p>
+<p>配对之后，agent 能用到 12 个工具：<code>connect</code>、<code>exec</code>、<code>read_file</code>、<code>write_file</code>、<code>list_dir</code>、<code>stat</code>、<code>glob</code>、<code>grep</code>、<code>process_list</code>、<code>tail_log</code>、<code>upload_file</code>、<code>download_file</code>。其中 <code>connect</code> 和上传下载在 help 端实现，其余在 share 端的工具 daemon 里执行（share 端另有一个内部用的 <code>file_md5</code>）。</p>
+<p>另外还有一个浏览器控制台（<code>remote-assist-webui</code>），给人用：文件树、流式终端、搜索、进程、上传下载、图片预览，以及”通道内热升级远端 share”。它走的是和 AI agent 完全相同的 MCP 协议。</p>
+<h2 id="三、演进时间线"><a href="#三、演进时间线" class="headerlink" title="三、演进时间线"></a>三、演进时间线</h2><table>
+<thead>
+<tr>
+<th>时间</th>
+<th>阶段</th>
+<th>关键词</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>2026-03</td>
+<td>SSH 隧道中转工具</td>
+<td>relay、协助码、TLS、STUN、P2P 打洞</td>
+</tr>
+<tr>
+<td>2026-03 ~ 04</td>
+<td>把 P2P 做可靠</td>
+<td>UDP 可靠传输、对称 NAT、UDP 中继回落、LAN 快速通道、代理旁路</td>
+</tr>
+<tr>
+<td>2026-05</td>
+<td>转向：给 AI agent 开 MCP 工具通道</td>
+<td>MCP、9 个工具、AEAD、bootstrap 模式</td>
+</tr>
+<tr>
+<td>2026-06 ~ 08</td>
+<td>能用 → 好用</td>
+<td>standalone、文件传输、续传、流式 exec、浏览器控制台、热升级、一键安装</td>
+</tr>
+<tr>
+<td>2026-09</td>
+<td>安全加固</td>
+<td>静默失效、TOFU 证书钉扎、打洞包认证、工具协议 v2、抗重放</td>
+</tr>
+<tr>
+<td>2026-09 ~ 10</td>
+<td>兼容与体验</td>
+<td><code>--min-proto</code> 向后兼容、代码页转码、传输进度条</td>
+</tr>
+</tbody></table>
+<p>最初的版本其实就是”SSH 隧道中转器”：help 端在本地监听一个端口，经 relay 转到 share 端的 22 端口。它解决了穿 NAT 的问题，但没解决”远端要有 sshd”的问题。5 月那次转向才是这个项目真正成型的地方：<strong>不再转发 SSH，而是自己实现一套远程工具，直接暴露给 AI</strong>。</p>
+<h2 id="四、踩过的坑"><a href="#四、踩过的坑" class="headerlink" title="四、踩过的坑"></a>四、踩过的坑</h2><h3 id="4-1-NAT-穿透：比想象中难得多"><a href="#4-1-NAT-穿透：比想象中难得多" class="headerlink" title="4.1 NAT 穿透：比想象中难得多"></a>4.1 NAT 穿透：比想象中难得多</h3><p>P2P 打洞的教科书流程是：两端各自向 STUN 问到自己的公网映射，交换地址，互相发 UDP 包。实际跑起来的问题一个接一个：</p>
+<ul>
+<li><strong>对称型 NAT</strong>：每个目标地址映射一个新端口，STUN 问到的端口对对端没用。先加了 ±10 的端口预测，后来做了 NAT 类型检测（向两个不同 IP 的 STUN 查映射端口是否一致），对称 NAT 下扩大到 ±100，再加上”生日攻击”——本端开 64 个额外 socket 多轮发送，赌两边的端口撞上。</li>
+<li><strong>打不通的终究打不通</strong>：加了 UDP 中继回落（经 STUN 服务器转发），auto 模式超时后先回落 relay，再在后台 30s&#x2F;60s&#x2F;120s 重试打洞，成功了再切过去。</li>
+<li><strong>同一个局域网绕了一大圈</strong>：两端明明在同一个网段，却去公网绕。relay 侧检测双方是否同网（同公网 IP 或私网同 &#x2F;16），给出 hint，客户端只以 50ms 间隔打私网地址，跳过 STUN 和公网打洞。</li>
+<li><strong>网卡选错了</strong>：开着 Clash 之类 TUN 代理时，默认路由被劫持，打洞包从虚拟网卡出去；后来又遇到 VirtualBox Host-Only 网卡（192.168.56.x）——它不在黑名单里、有广播能力，被启发式选成”物理网卡”，可它根本没有外网路由。最后改成首选默认路由出口 IP，启发式只做兜底。</li>
+</ul>
+<h3 id="4-2-在-UDP-上自己造一个”TCP”"><a href="#4-2-在-UDP-上自己造一个”TCP”" class="headerlink" title="4.2 在 UDP 上自己造一个”TCP”"></a>4.2 在 UDP 上自己造一个”TCP”</h3><p>P2P 隧道是 UDP，上面跑的是需要可靠有序的数据。第一版加了序号、ACK、指数退避重传和按序交付，看起来能用了。直到开始传大文件：</p>
+<ul>
+<li><strong>没有流控</strong>：发送端一口气把数据全怼出去，接收缓冲一满就丢，大文件在 offset 0 就 EOF；</li>
+<li><strong>重传 5 次就拆隧道</strong>：网络稍微抖一下，单个包重传超限，整条隧道就被判死，大约每传几 MB 断一次。</li>
+</ul>
+<p>修法是加发送窗口（<code>maxInflight</code> + 条件变量），重传退避封顶但<strong>不再因为单包失败拆隧道</strong>，隧道生死只看 peer 超时。这件事的教训是：在 UDP 上补可靠性，流控和”什么时候判死”跟重传一样重要。</p>
+<h3 id="4-3-“MCP-又挂了”：一条请求拖死整个会话"><a href="#4-3-“MCP-又挂了”：一条请求拖死整个会话" class="headerlink" title="4.3 “MCP 又挂了”：一条请求拖死整个会话"></a>4.3 “MCP 又挂了”：一条请求拖死整个会话</h3><p>接入 agent 之后（最早是在 Claude Code 上跑），最常见的反馈是”MCP 断了 &#x2F; No such tool available”。逐个查下来，是几种不同的”一处卡住、全局冻结”：</p>
+<ol>
+<li><strong>空闲两分钟后必死</strong>：help 端没开心跳，只靠 2 分钟读超时兜底。空闲期间读超时触发，读循环退出；下一次工具调用发出去后永远等不到响应，MCP server 被卡死，宿主判定它死亡并杀掉进程。修法：help 端 30 秒心跳，单次调用加硬超时。</li>
+<li><strong>一条慢调用堵死所有调用</strong>：MCP server 原本是串行读 stdin，<code>tools/call</code> 同步阻塞，期间连取消通知都读不到。改成工具调用并发分发，按 JSON-RPC id 登记可取消的 context，把 <code>notifications/cancelled</code> 真正接通。</li>
+<li><strong>半死的隧道上写操作永久阻塞</strong>：写阻塞时还占着连接锁，心跳、读超时设置、读循环跟着一起冻住。写操作加 30 秒超时；share 端每个工具请求都有按工具分档的兜底 deadline，Dispatch 放进 goroutine 和计时器赛跑——<strong>任何请求都必须有返回</strong>，哪怕是 <code>deadline_exceeded</code>。</li>
+</ol>
+<h3 id="4-4-P2P-和工具握手的死锁"><a href="#4-4-P2P-和工具握手的死锁" class="headerlink" title="4.4 P2P 和工具握手的死锁"></a>4.4 P2P 和工具握手的死锁</h3><p>工具通道需要先握手协商会话密钥。最初的流程是 help 在 relay 上等握手应答，而 share 一旦 P2P 建立，就转去 P2P 上等 help 的模式头——两边互相死等，connect 15 秒超时。P2P 越快建立越必现，同机、局域网场景百分之百触发。</p>
+<p>先修成”先纯协商 P2P，结果决定在哪条通道握手”，后来又进一步改成<strong>握手永远锚定在 relay 上，P2P 只在后台协商，双向探活通过后热切换，隧道中断就回落 relay 并重新握手</strong>。控制面固定、数据面可切换，时序问题就少了一大类。</p>
+<h3 id="4-5-文件传输：比”循环调-write-file”复杂"><a href="#4-5-文件传输：比”循环调-write-file”复杂" class="headerlink" title="4.5 文件传输：比”循环调 write_file”复杂"></a>4.5 文件传输：比”循环调 write_file”复杂</h3><p><code>upload_file</code> &#x2F; <code>download_file</code> 是在 help 端拼出来的复合工具，循环调用远端的 <code>write_file</code> &#x2F; <code>read_file</code>，所以远端 share 不需要升级就能用。分块大小选 512 KiB：base64 之后约 683 KB，给 MCP 的 1 MB 帧留出余量。</p>
+<p>后面的演进几乎全是在处理”网络会断”：</p>
+<ul>
+<li><strong>续传不能信调用方</strong>：写成功了但响应丢了，help 以为失败再追加一次，文件就膨胀出整数个 chunk。改成续传点以<strong>远端 stat 到的实际大小</strong>为准。</li>
+<li><strong>并发写会留洞</strong>：为了提速做过 8 路并发上传（<code>write_file</code> 带绝对偏移，pwrite 幂等可乱序），但并发写失败会在远端留空洞，”按 stat 大小续传”就不安全了——会跳过空洞，文件损坏。最后退回顺序上传：吞吐在高 RTT 下下降，但换来续传正确。<strong>正确性优先于速度</strong>。</li>
+<li><strong>断线自动重连续传</strong>：隧道断开时用缓存的协助码自动重连，从断点继续，不需要人工介入。</li>
+<li><strong>进度显示</strong>（2026-10 最新的一次改动）：share 端原来每个分块打一行日志，300 MB 就是 600 行刷屏。现在聚合成一行原地刷新：</li>
+</ul>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">上传 xgimi_remote.apk [==========&gt;         ]  50.0%  150.0 MB/300.0 MB  8.1 MB/s  剩余 00:18</span><br></pre></td></tr></table></figure>
+
+<p>这个功能写起来比看上去难。help 端要在分块里额外带上文件总大小（<code>total</code>，旧版 share 会忽略这个字段）；慢链路上块与块之间隔几秒很正常，不能拿”空闲 3 秒”判结束；重试的分块要按偏移去重；收尾后迟到的重试要吞掉，但得写审计日志；中文要按 2 列计算终端宽度；进度行还不能和其他日志粘在一起。最后是在真实控制台里，用 <code>ReadConsoleOutputCharacter</code> 把屏幕读出来截帧验证的。</p>
+<h3 id="4-6-输出是给-AI-看的"><a href="#4-6-输出是给-AI-看的" class="headerlink" title="4.6 输出是给 AI 看的"></a>4.6 输出是给 AI 看的</h3><p>工具的输出要被大模型读，这带来几个和”给人看”不同的要求：</p>
+<ul>
+<li><strong>别给 base64</strong>：<code>[]byte</code> 默认被 JSON 编码成 base64，模型读不懂还费 token。改成合法 UTF-8 直接给文本，二进制只标注大小。</li>
+<li><strong>截断要保留尾部</strong>：编译错误、panic 堆栈、测试失败摘要几乎总在输出末尾，从头截断恰好丢掉唯一有用的部分。统一改成保留首尾、省略中间，显式标记截断，并给出调大上限的参数。</li>
+<li><strong>中文 Windows 的代码页</strong>：<code>ping</code>、<code>systeminfo</code>、cmd 内置命令输出的是 CP936（GBK），被当成二进制整段丢弃，agent 只能换种方式重跑。现在 share 端按活动代码页用 <code>MultiByteToWideChar</code> 转成 UTF-8 再上行，转不动的才原样透传。</li>
+</ul>
+<h3 id="4-7-安全：从”看起来安全”到”真的安全”"><a href="#4-7-安全：从”看起来安全”到”真的安全”" class="headerlink" title="4.7 安全：从”看起来安全”到”真的安全”"></a>4.7 安全：从”看起来安全”到”真的安全”</h3><p>这是花时间最多的部分，也是最有收获的部分。</p>
+<p><strong>第一课：别搞安全剧场。</strong> 最初有个 <code>--root</code> 参数，把文件工具限制在某个目录里。后来意识到它挡不住 exec——一行 <code>sh -c &#39;cp x &lt;root&gt;/&#39;</code> 就绕过去了。把它当安全边界，就是安全剧场。于是把它重新定位成可选的”防手滑护栏”，在文档里写明：真正的信任边界是”协助码交给了谁”，要隔离就上容器或低权限账号。</p>
+<p><strong>第二课：最危险的是静默失效。</strong> 一次集中排查，找出三处”出错了但没有任何信号”的问题：</p>
+<ol>
+<li>Windows <code>--elevate</code> 提权重启时，参数被朴素地用空格拼接，<code>--root &quot;C:\Work Dir&quot; --allow-exec git,go</code> 在空格处被撕开，Go 的 flag 解析在第一个位置参数处停止，<strong><code>--allow-exec</code> 白名单被整个吞掉</strong>——用户以为拿到的是”管理员 + 收紧的白名单”，实际是”管理员 + 放行一切”。</li>
+<li>relay 对工具消息按”条数”限流，流式 exec 输出一个大日志就超限，超限的帧被<strong>直接丢弃</strong>；而每帧有独立的 AEAD nonce，丢一帧不影响后续解密，两端谁都察觉不到，输出中间少了几 KB。</li>
+<li>流帧的序号 share 端写了、help 端从来不看。</li>
+</ol>
+<p>修法分别是：按 <code>CommandLineToArgvW</code> 规则转义参数，并拒绝任何残留的位置参数；限流改成按字节计费，超限时用 TCP 背压而不是丢帧；校验序号连续，有空洞就把整次调用判为失败。原则只有一条：<strong>护栏失效时，宁可失败得刺眼。</strong></p>
+<p><strong>第三课：加密不等于认证。</strong> 工具通道用协助码经 HKDF 派生会话密钥，载荷用 XChaCha20-Poly1305 加密。但请求里只有参数是密文，工具名、调用 id 都是明文——截获一条 <code>read_file{path: X}</code> 的密文，把工具名改成 <code>write_file</code> 重发，远端解出来是 <code>Content=nil</code>，按截断模式打开文件，X 就被清成 0 字节。工具协议 v2 因此做了三件事：</p>
+<ul>
+<li><strong>AAD 绑定</strong>：明文字段（工具名、id、deadline、流帧的 seq）都进 AAD，带长度前缀防止拼接歧义，三个方向各用不同标签；</li>
+<li><strong>强制密文</strong>：握手后不带合法密文的请求一律拒绝（原来”没有 args 就跳过解密”等于留了个后门）；</li>
+<li><strong>抗重放</strong>：按调用 id 做 1024 位滑动窗口，语义和 IPsec 一样。</li>
+</ul>
+<p>v2 写完后又复审了两轮，每轮都找出真问题：响应方向的 <code>ok</code> &#x2F; <code>error_code</code> 也是明文，把 <code>result</code> 删掉就能把一次成功的 <code>read_file</code> 伪造成”成功 + 空文件”——AI 会据此断定文件是空的；一条本地合成的 <code>server_busy</code> 绕过了加封路径；先记录序号再解密，让伪造的空帧可以”填平”丢帧检测。</p>
+<p><strong>第四课：信任要有锚点。</strong> relay 默认用自签证书，客户端默认跳过校验——这意味着中间人永远可行，而且不留痕迹。现在用 TOFU（首次信任）：第一次连接时记下证书指纹，之后指纹变了就拒连，攻击窗口从”永远”缩小到”仅首次”。P2P 打洞包原来只靠 session ID 识别对端，而 session ID 在打洞时会被喷到一大片端口上，根本不是秘密；现在打洞包带上用协助码派生的 HMAC，并做域分离。</p>
+<p><strong>第五课：兼容是新版本的责任。</strong> v2 和旧版 0.0.x 在会话层完全不通。最终方案是默认拒绝 v1，新版可以用 <code>--min-proto=1</code> 显式降级与旧版互通，并检测降级篡改。旧版没有这个参数，所以兼容的责任只能落在新的那一端。</p>
+<h2 id="五、能做到什么"><a href="#五、能做到什么" class="headerlink" title="五、能做到什么"></a>五、能做到什么</h2><ul>
+<li>被协助端一条命令（或双击），<strong>不需要管理员权限、不需要安装</strong>，默认模式下也不开监听端口（只主动连出去）；Windows、Linux、macOS 的 amd64 &#x2F; arm64 都支持，提供一键安装脚本；</li>
+<li>穿 NAT：P2P 直连优先，打不通自动回落中转；默认用内置的海外公共 relay，连不上就从 Release 下载 relay 自建，局域网内可以用 <code>--standalone</code> 完全不依赖外部服务；</li>
+<li>Claude Code、Codex、豆包等任何支持 MCP 的 agent 直接执行命令、读写文件、grep、看进程、跟踪日志、传大文件（断线自动续传，有进度显示）；</li>
+<li>被协助端的屏幕上实时显示 AI 在做什么，每条操作都有审计日志；</li>
+<li>人也能用：浏览器控制台有文件树、流式终端、上传下载，还能在不断开连接的情况下热升级远端的 share；</li>
+<li>relay 可以部署成 Linux 服务或 Windows 原生服务，带分层限流、资源上限和 slowloris 防护。</li>
+</ul>
+<h2 id="六、优势与不足"><a href="#六、优势与不足" class="headerlink" title="六、优势与不足"></a>六、优势与不足</h2><h3 id="优势"><a href="#优势" class="headerlink" title="优势"></a>优势</h3><ul>
+<li><strong>对被协助方极其友好</strong>：从”请开一下 SSH、开一下防火墙”变成”跑一下这个、把这段话发给我”；</li>
+<li><strong>为 AI 设计</strong>：工具的 schema、输出格式、截断策略、错误信息都是按”给 LLM 读”来调的；</li>
+<li><strong>网络适应性强</strong>：P2P、中转、局域网直连自动选择，断线自动重连；</li>
+<li><strong>透明</strong>：被协助端能看到每一条操作，协助结束关掉进程就什么都不留。</li>
+</ul>
+<h3 id="不足与做不到的事"><a href="#不足与做不到的事" class="headerlink" title="不足与做不到的事"></a>不足与做不到的事</h3><ul>
+<li><strong>不是远程桌面</strong>：没有 GUI 画面，点不了按钮。需要看界面的场景还得配合远程桌面工具；</li>
+<li><strong>没有交互式终端</strong>：exec 是”一条命令一次返回”（支持流式输出），跑不了需要交互输入的程序，<code>vim</code>、<code>top</code> 这类 TUI 也不行；</li>
+<li><strong>不做通用端口转发</strong>：老的 <code>--legacy-ssh</code> 隧道模式还在，但只能转发到 share 端 <code>--ssh</code> 指定的那一个地址；</li>
+<li><strong>relay 是可信边界</strong>：协助码由 relay 生成，密钥派生的输入在 relay 侧全部可见。也就是说，relay 失陷就能解密、伪造活动会话的工具数据。默认的公共 relay 方便试用，敏感环境请<strong>自己部署 relay</strong>，不要用来路不明的中转。写这篇文章时回头核对，发现 README 里一直写着”即使 relay 被攻破，也看不见、无法伪造工具内容”，跟实现不符，已经更正（<a target="_blank" rel="noopener" href="https://github.com/kegechen/remote-assist-tool/commit/4340cd1">4340cd1</a>）；同时补上了默认 relay 在海外、如何自建的说明（<a target="_blank" rel="noopener" href="https://github.com/kegechen/remote-assist-tool/commit/514117f">514117f</a>）；顺手把文档和命令行提示里写死的”给 Claude 用”统一改成了”任何支持 MCP 的 AI agent”，README 也换上了文中这张架构图（<a target="_blank" rel="noopener" href="https://github.com/kegechen/remote-assist-tool/commit/05ed347">05ed347</a>）；</li>
+<li><strong>协助码就是全部权限</strong>：拿到协助码等于能在那台机器上以当前用户执行任意命令。<code>--root</code> 和 exec 黑白名单只防手滑，不是安全边界；</li>
+<li><strong>文件上传是顺序的</strong>：为了续传正确牺牲了高延迟链路下的吞吐，回环上大约 8～10 MB&#x2F;s；</li>
+<li><strong>自签证书 + TOFU</strong> 只能防”首次之后”的中间人，首次连接仍需在可信网络下完成；</li>
+<li><strong>没有发布签名</strong>：一键安装校验 SHA256，但校验文件和二进制来自同一个 Release，防不了 Release 本身被替换。</li>
+</ul>
+<h2 id="七、怎么开发的：和-Claude-Code-结对"><a href="#七、怎么开发的：和-Claude-Code-结对" class="headerlink" title="七、怎么开发的：和 Claude Code 结对"></a>七、怎么开发的：和 Claude Code 结对</h2><p>这个项目的大部分代码是我和 Claude Code 结对写出来的——177 个提交里，绝大多数带着 <code>Co-Authored-By: Claude</code>，跨越了 Opus 4.6 到 Opus 5.5 好几代模型。顺带一提，这个工具本身就是给 AI agent 用的，所以后期很多调试也是让 Claude Code 通过它去调试远端机器完成的。</p>
+<p>半年下来，最有价值的不是”AI 写得快”，而是几条逐渐固定下来的工作约定：</p>
+<ul>
+<li><strong>动手前先查 git 历史</strong>。很多”看起来不对”的代码，其实是当初为了解决某个问题刻意写成那样的；”修”掉它，原来的问题就回来了。比如顺序上传，就是从 8 路并发退回来的。</li>
+<li><strong>没跑红的测试不算数</strong>。每个新测试都要先把被测逻辑中性化（把判断改成 <code>if false</code>、让函数直接返回），确认测试会失败，再恢复确认通过。传输进度那个功能前后做了三十多处这种 RED 证明，其中有几处变异后测试依然是绿的——有的暴露出测试写得太弱，有一处则说明那段判断根本是死代码，于是删掉了。</li>
+<li><strong>复审循环直到挑不出问题</strong>。每轮修复本身也是新代码，也要被审。协议 v2 复审了两轮才收敛，进度条功能审了三轮，每轮都能在上一轮的加固代码里找出真问题。</li>
+<li><strong>最后在真实环境跑一遍</strong>。单元测试全绿的进度条，在真实控制台里一跑，发现每次传输都多出两行和屏幕汇总重复的审计日志，小文件还显示了没有意义的”平均 236 KB&#x2F;s”。</li>
+</ul>
+<h2 id="八、结语"><a href="#八、结语" class="headerlink" title="八、结语"></a>八、结语</h2><p>回头看，这个项目最初只想解决”Windows 上开 SSH 太麻烦”，后来变成了一个更有意思的问题：<strong>怎么给 AI 一双安全、可靠、能穿越网络的手</strong>。网络层的坑靠耐心一个个填，”为 AI 设计输出”是个新问题，而安全这块最大的收获是心态上的：别满足于”加了密”，要去问”失效时有没有信号”、”信任的锚点在哪里”。</p>
+<p>项目地址：<a target="_blank" rel="noopener" href="https://github.com/kegechen/remote-assist-tool">https://github.com/kegechen/remote-assist-tool</a>，欢迎试用和提 issue。</p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a href="https://kegechen.github.io">Mike</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://kegechen.github.io/2026/10/17/remote-assist-tool-ai-agent-remote-debug/">https://kegechen.github.io/2026/10/17/remote-assist-tool-ai-agent-remote-debug/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://kegechen.github.io" target="_blank">Mike's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/remote-assist-tool/">remote-assist-tool</a><a class="post-meta__tags" href="/tags/AI-Agent/">AI Agent</a><a class="post-meta__tags" href="/tags/Claude-Code/">Claude Code</a><a class="post-meta__tags" href="/tags/MCP/">MCP</a><a class="post-meta__tags" href="/tags/Go/">Go</a><a class="post-meta__tags" href="/tags/NAT-%E7%A9%BF%E9%80%8F/">NAT 穿透</a><a class="post-meta__tags" href="/tags/P2P/">P2P</a><a class="post-meta__tags" href="/tags/%E8%BF%9C%E7%A8%8B%E8%B0%83%E8%AF%95/">远程调试</a><a class="post-meta__tags" href="/tags/%E5%AE%89%E5%85%A8/">安全</a></div><div class="post-share"><div class="social-share" data-image="https://github.com/kegechen.png" data-sites="facebook,x,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related full-width" href="/2026/05/07/lan-mouse-dde-kwin-uinput-stickycorners/" title="给 lan-mouse 加上 uinput 后端 + Win11 风格越界停留：dde-kwin Wayland 下的软 KVM 折腾记"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">下一篇</div><div class="info-item-2">给 lan-mouse 加上 uinput 后端 + Win11 风格越界停留：dde-kwin Wayland 下的软 KVM 折腾记</div></div><div class="info-2"><div class="info-item-1"> 把一台 ARM64 UOS（deepin v23 &#x2F; dde-kwin 5.15 &#x2F; Wayland）和一台 Windows 11 通过热点连起来，用同一套鼠标键盘办公。Deskflow 在 Qt6 缺失下装不上，Synergy 收费，RustDesk 是远程桌面不是软 KVM。最后选了开源 Rust 项目 lan-mouse v0.10，但发现它在 dde-kwin Wayland 上完全推不动光标——只好动手改源码。本文记录从 0 到能用的全部踩坑：uinput 后端、Win11 风格的 sticky-corners 越界视觉、双向剪贴板同步守护进程，以及 Wayland 协议层无法绕开的限制。 Fork: https://github.com/kegechen/lan-mouse/tree/feature/dde-kwin-uinput-stickycorners    背景：为什么不用现成方案需求很朴素：  Windows 主机 + UOS ARM64 副屏（开发机），鼠标越过屏幕边缘自动切到对端 两端共享文本剪贴板 不要 RDP &#x2F; VN...</div></div></div></a></nav></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="https://github.com/kegechen.png" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">Mike</div><div class="author-info-description">记录工作技术笔记和个人生活点滴</div><div class="site-data"><a href="/archives/"><div class="headline">文章</div><div class="length-num">5</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">28</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/kegechen"><i class="fab fa-github"></i><span>Github</span></a></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">欢迎来到我的博客！</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%80%E3%80%81%E8%A6%81%E8%A7%A3%E5%86%B3%E7%9A%84%E9%97%AE%E9%A2%98"><span class="toc-number">1.</span> <span class="toc-text">一、要解决的问题</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#1-1-%E5%9C%BA%E6%99%AF"><span class="toc-number">1.1.</span> <span class="toc-text">1.1 场景</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#1-2-%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E7%9B%B4%E6%8E%A5%E7%94%A8-SSH"><span class="toc-number">1.2.</span> <span class="toc-text">1.2 为什么不直接用 SSH</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%8C%E3%80%81%E7%8E%B0%E5%9C%A8%E9%95%BF%E4%BB%80%E4%B9%88%E6%A0%B7"><span class="toc-number">2.</span> <span class="toc-text">二、现在长什么样</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%89%E3%80%81%E6%BC%94%E8%BF%9B%E6%97%B6%E9%97%B4%E7%BA%BF"><span class="toc-number">3.</span> <span class="toc-text">三、演进时间线</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%9B%9B%E3%80%81%E8%B8%A9%E8%BF%87%E7%9A%84%E5%9D%91"><span class="toc-number">4.</span> <span class="toc-text">四、踩过的坑</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#4-1-NAT-%E7%A9%BF%E9%80%8F%EF%BC%9A%E6%AF%94%E6%83%B3%E8%B1%A1%E4%B8%AD%E9%9A%BE%E5%BE%97%E5%A4%9A"><span class="toc-number">4.1.</span> <span class="toc-text">4.1 NAT 穿透：比想象中难得多</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-2-%E5%9C%A8-UDP-%E4%B8%8A%E8%87%AA%E5%B7%B1%E9%80%A0%E4%B8%80%E4%B8%AA%E2%80%9DTCP%E2%80%9D"><span class="toc-number">4.2.</span> <span class="toc-text">4.2 在 UDP 上自己造一个”TCP”</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-3-%E2%80%9CMCP-%E5%8F%88%E6%8C%82%E4%BA%86%E2%80%9D%EF%BC%9A%E4%B8%80%E6%9D%A1%E8%AF%B7%E6%B1%82%E6%8B%96%E6%AD%BB%E6%95%B4%E4%B8%AA%E4%BC%9A%E8%AF%9D"><span class="toc-number">4.3.</span> <span class="toc-text">4.3 “MCP 又挂了”：一条请求拖死整个会话</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-4-P2P-%E5%92%8C%E5%B7%A5%E5%85%B7%E6%8F%A1%E6%89%8B%E7%9A%84%E6%AD%BB%E9%94%81"><span class="toc-number">4.4.</span> <span class="toc-text">4.4 P2P 和工具握手的死锁</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-5-%E6%96%87%E4%BB%B6%E4%BC%A0%E8%BE%93%EF%BC%9A%E6%AF%94%E2%80%9D%E5%BE%AA%E7%8E%AF%E8%B0%83-write-file%E2%80%9D%E5%A4%8D%E6%9D%82"><span class="toc-number">4.5.</span> <span class="toc-text">4.5 文件传输：比”循环调 write_file”复杂</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-6-%E8%BE%93%E5%87%BA%E6%98%AF%E7%BB%99-AI-%E7%9C%8B%E7%9A%84"><span class="toc-number">4.6.</span> <span class="toc-text">4.6 输出是给 AI 看的</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-7-%E5%AE%89%E5%85%A8%EF%BC%9A%E4%BB%8E%E2%80%9D%E7%9C%8B%E8%B5%B7%E6%9D%A5%E5%AE%89%E5%85%A8%E2%80%9D%E5%88%B0%E2%80%9D%E7%9C%9F%E7%9A%84%E5%AE%89%E5%85%A8%E2%80%9D"><span class="toc-number">4.7.</span> <span class="toc-text">4.7 安全：从”看起来安全”到”真的安全”</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%94%E3%80%81%E8%83%BD%E5%81%9A%E5%88%B0%E4%BB%80%E4%B9%88"><span class="toc-number">5.</span> <span class="toc-text">五、能做到什么</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%AD%E3%80%81%E4%BC%98%E5%8A%BF%E4%B8%8E%E4%B8%8D%E8%B6%B3"><span class="toc-number">6.</span> <span class="toc-text">六、优势与不足</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%BC%98%E5%8A%BF"><span class="toc-number">6.1.</span> <span class="toc-text">优势</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%8D%E8%B6%B3%E4%B8%8E%E5%81%9A%E4%B8%8D%E5%88%B0%E7%9A%84%E4%BA%8B"><span class="toc-number">6.2.</span> <span class="toc-text">不足与做不到的事</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%83%E3%80%81%E6%80%8E%E4%B9%88%E5%BC%80%E5%8F%91%E7%9A%84%EF%BC%9A%E5%92%8C-Claude-Code-%E7%BB%93%E5%AF%B9"><span class="toc-number">7.</span> <span class="toc-text">七、怎么开发的：和 Claude Code 结对</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%AB%E3%80%81%E7%BB%93%E8%AF%AD"><span class="toc-number">8.</span> <span class="toc-text">八、结语</span></a></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/10/17/remote-assist-tool-ai-agent-remote-debug/" title="不装 SSH，让 AI agent 直接上手调试远端机器：remote-assist-tool 半年开发记">不装 SSH，让 AI agent 直接上手调试远端机器：remote-assist-tool 半年开发记</a><time datetime="2026-10-17T14:30:00.000Z" title="发表于 2026-10-17 22:30:00">2026-10-17</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/05/07/lan-mouse-dde-kwin-uinput-stickycorners/" title="给 lan-mouse 加上 uinput 后端 + Win11 风格越界停留：dde-kwin Wayland 下的软 KVM 折腾记">给 lan-mouse 加上 uinput 后端 + Win11 风格越界停留：dde-kwin Wayland 下的软 KVM 折腾记</a><time datetime="2026-05-07T08:00:00.000Z" title="发表于 2026-05-07 16:00:00">2026-05-07</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/03/19/cf-workers-vless-debug/" title="Cloudflare Workers 部署 VLESS 代理：从 522 报错到发现 CF 关键字扫描机制的完整调试记录">Cloudflare Workers 部署 VLESS 代理：从 522 报错到发现 CF 关键字扫描机制的完整调试记录</a><time datetime="2026-03-19T10:12:00.000Z" title="发表于 2026-03-19 18:12:00">2026-03-19</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/02/25/claude-openclaw-guide/" title="Claude Code &amp;&amp; OpenClaw 初体验">Claude Code &amp;&amp; OpenClaw 初体验</a><time datetime="2026-02-25T11:30:00.000Z" title="发表于 2026-02-25 19:30:00">2026-02-25</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/02/25/my-first-blog/" title="我的第一篇博客">我的第一篇博客</a><time datetime="2026-02-25T09:55:43.000Z" title="发表于 2026-02-25 17:55:43">2026-02-25</time></div></div></div></div></div></div></main><footer id="footer"><div class="footer-other"><div class="footer-copyright"><span class="copyright">&copy;&nbsp;2025 - 2026 By Mike</span><span class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo 8.1.1</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly 5.5.4</a></span></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js?v=5.5.4"></script><script src="/js/main.js?v=5.5.4"></script><div class="js-pjax"></div><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>
