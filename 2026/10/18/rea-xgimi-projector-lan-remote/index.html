@@ -1,0 +1,413 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>用 AI + REA 逆向极米投影仪的局域网遥控协议：过程、踩坑与工具的局限 | Mike's Blog</title><meta name="author" content="Mike"><meta name="copyright" content="Mike"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="家里的极米投影仪，手机遥控要用「极米助手」——一个 208MB、带商城、社区、IM 的超级 App，还时不时让你登录。我想要的只是一个干净的局域网遥控器。 这次我想顺便试试 REA（Reverse Engineer Anything）这个面向 AI agent 的逆向工具，让 Claude Code 用它来分析 APK。最后遥控器做出来了，基本可用；但说实话，REA 在这个项目里几乎没派上用场。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="用 AI + REA 逆向极米投影仪的局域网遥控协议：过程、踩坑与工具的局限">
+<meta property="og:url" content="https://kegechen.github.io/2026/10/18/rea-xgimi-projector-lan-remote/index.html">
+<meta property="og:site_name" content="Mike&#39;s Blog">
+<meta property="og:description" content="家里的极米投影仪，手机遥控要用「极米助手」——一个 208MB、带商城、社区、IM 的超级 App，还时不时让你登录。我想要的只是一个干净的局域网遥控器。 这次我想顺便试试 REA（Reverse Engineer Anything）这个面向 AI agent 的逆向工具，让 Claude Code 用它来分析 APK。最后遥控器做出来了，基本可用；但说实话，REA 在这个项目里几乎没派上用场。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://github.com/kegechen.png">
+<meta property="article:published_time" content="2026-10-18T05:00:00.000Z">
+<meta property="article:modified_time" content="2026-10-18T04:19:03.290Z">
+<meta property="article:author" content="Mike">
+<meta property="article:tag" content="Android">
+<meta property="article:tag" content="Claude Code">
+<meta property="article:tag" content="Flutter">
+<meta property="article:tag" content="MCP">
+<meta property="article:tag" content="REA">
+<meta property="article:tag" content="投影仪">
+<meta property="article:tag" content="逆向工程">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://github.com/kegechen.png"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "用 AI + REA 逆向极米投影仪的局域网遥控协议：过程、踩坑与工具的局限",
+  "url": "https://kegechen.github.io/2026/10/18/rea-xgimi-projector-lan-remote/",
+  "image": "https://github.com/kegechen.png",
+  "datePublished": "2026-10-18T05:00:00.000Z",
+  "dateModified": "2026-10-18T04:19:03.290Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "Mike",
+      "url": "https://kegechen.github.io"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/favicon.png"><link rel="canonical" href="https://kegechen.github.io/2026/10/18/rea-xgimi-projector-lan-remote/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css?v=5.5.4"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.1.0/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        if (!ttl) return
+        const expiry = Date.now() + ttl * 86400000
+        localStorage.setItem(key, JSON.stringify({ value, expiry }))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return undefined
+        const { value, expiry } = JSON.parse(itemStr)
+        if (Date.now() > expiry) {
+          localStorage.removeItem(key)
+          return undefined
+        }
+        return value
+      }
+    }
+
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        Object.entries(attr).forEach(([key, val]) => script.setAttribute(key, val))
+        script.onload = script.onreadystatechange = () => {
+          if (!script.readyState || /loaded|complete/.test(script.readyState)) resolve()
+        }
+        script.onerror = reject
+        document.head.appendChild(script)
+      }),
+      getCSS: (url, id) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onload = link.onreadystatechange = () => {
+          if (!link.readyState || /loaded|complete/.test(link.readyState)) resolve()
+        }
+        link.onerror = reject
+        document.head.appendChild(link)
+      }),
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
+
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
+        
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
+    
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":false},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.13.0/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '用 AI + REA 逆向极米投影仪的局域网遥控协议：过程、踩坑与工具的局限',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><link rel="stylesheet" href="/css/custom.css"><meta name="generator" content="Hexo 8.1.1"></head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="https://github.com/kegechen.png" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="site-data text-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">6</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">33</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> Home</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> Archives</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> Tags</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> Categories</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="not-top-img fixed" id="page-header"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><span class="site-name">Mike's Blog</span></a><a class="nav-page-title" href="/"><span class="site-name">用 AI + REA 逆向极米投影仪的局域网遥控协议：过程、踩坑与工具的局限</span><span class="site-name"><i class="fa-solid fa-circle-arrow-left"></i><span>  返回首页</span></span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> Home</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> Archives</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> Tags</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> Categories</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav></header><main class="layout" id="content-inner"><div id="post"><div id="post-info"><h1 class="post-title">用 AI + REA 逆向极米投影仪的局域网遥控协议：过程、踩坑与工具的局限</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-10-18T05:00:00.000Z" title="发表于 2026-10-18 13:00:00">2026-10-18</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-10-18T04:19:03.290Z" title="更新于 2026-10-18 12:19:03">2026-10-18</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/">技术笔记</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title=""><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">浏览量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div><article class="container post-content" id="article-container"><blockquote>
+<p>家里的极米投影仪，手机遥控要用「极米助手」——一个 208MB、带商城、社区、IM 的超级 App，还时不时让你登录。我想要的只是一个干净的局域网遥控器。</p>
+<p>这次我想顺便试试 <a target="_blank" rel="noopener" href="https://github.com/morluto/rea">REA</a>（Reverse Engineer Anything）这个面向 AI agent 的逆向工具，让 Claude Code 用它来分析 APK。最后遥控器做出来了，基本可用；但说实话，<strong>REA 在这个项目里几乎没派上用场</strong>。本文按时间线记录整个过程、每个坑是怎么解决的，以及我对 REA 和”AI 做逆向”这件事的局限性的看法。</p>
+</blockquote>
+<span id="more"></span>
+
+<h2 id="一、起因和目标"><a href="#一、起因和目标" class="headerlink" title="一、起因和目标"></a>一、起因和目标</h2><p>投影仪和手机在同一个局域网里，遥控理论上只需要局域网通信，没理由非要登录账号。最初的需求很朴素：</p>
+<ol>
+<li>搞清楚极米助手的遥控到底依不依赖账号；</li>
+<li>如果不依赖，做一个<strong>免登录、只有遥控功能</strong>的东西。</li>
+</ol>
+<p>最终交付的是一个 Flutter 写的手机遥控 App（release 包 7MB），外加一个 Python&#x2F;Tkinter 写的 PC 版遥控工具。手机版的界面尽量照着原版遥控页布局，降低使用成本：</p>
+<table>
+<thead>
+<tr>
+<th>功能</th>
+<th>状态</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>方向键 &#x2F; OK &#x2F; 返回 &#x2F; 主页 &#x2F; 菜单 &#x2F; 音量±</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>电源菜单：立即关机、系统关机菜单、定时关机（15&#x2F;30&#x2F;60&#x2F;120 分钟）、取消定时</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>全部设置（投影仪快捷菜单）</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>画面校正（自动梯形校正）</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>对焦 + &#x2F; 对焦 −</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>局域网自动发现、切回前台自动重连</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>自动对焦</td>
+<td>❌ 未解决（见后文）</td>
+</tr>
+<tr>
+<td>语音、截图、应用列表</td>
+<td>⏸ 暂未实现</td>
+</tr>
+</tbody></table>
+<h2 id="二、REA-是什么"><a href="#二、REA-是什么" class="headerlink" title="二、REA 是什么"></a>二、REA 是什么</h2><p>REA 是一个 MCP server，把一堆逆向工具（Ghidra、Hopper、IDA、JADX、Frida、GDB、Rizin、adb、浏览器 CDP……）包装成统一接口给 AI agent 调用。它的几个设计理念我挺认同：</p>
+<ul>
+<li><strong>证据优先</strong>：每个结果都带 Evidence 记录（目标文件的 SHA-256、使用的分析引擎、覆盖范围和局限），区分”观察到的”、”推断的”和”未知的”；</li>
+<li><strong>目标内容不可信</strong>：从二进制里读出的字符串、反编译代码一律标记为不可信数据，防止被逆向目标里的文本做提示词注入；</li>
+<li><strong>先摘要再深入</strong>：大结果先返回摘要，再按需翻页，避免一次把上下文塞爆。</li>
+</ul>
+<p>安装很简单：<code>npx rea-agents setup</code>，它会把 MCP server 注册到 Claude Code，并附带一份 skill（使用说明）。</p>
+<h2 id="三、时间线"><a href="#三、时间线" class="headerlink" title="三、时间线"></a>三、时间线</h2><table>
+<thead>
+<tr>
+<th>时间</th>
+<th>阶段</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>10-16 上午</td>
+<td>用 REA 分析 APK</td>
+<td>REA 工具当前会话未加载；改用本机已有的 apktool 反编译</td>
+</tr>
+<tr>
+<td>10-16 上午</td>
+<td>静态分析鉴权架构</td>
+<td>结论：遥控走局域网直连，认的是投影仪本地授权，不是账号</td>
+</tr>
+<tr>
+<td>10-16 上午</td>
+<td>尝试改包免登录</td>
+<td>改包名共存、跳过登录都做了，最后卡在”添加设备”依赖云端绑定，放弃</td>
+</tr>
+<tr>
+<td>10-16 中午</td>
+<td>写 PC 遥控工具</td>
+<td>Tkinter，几轮 UI 打磨</td>
+</tr>
+<tr>
+<td>10-16 下午</td>
+<td>写 Flutter 手机版</td>
+<td>公司网络拦截 Google Maven，构建卡住，换阿里云镜像解决</td>
+</tr>
+<tr>
+<td>10-17 上午</td>
+<td>第一次真机测试</td>
+<td>连接失败 <code>errno 111</code>——端口是错的</td>
+</tr>
+<tr>
+<td>10-17 中午</td>
+<td>远程上真机排查</td>
+<td>找到真实端口 13145，协议跑通</td>
+</tr>
+<tr>
+<td>10-17 下午</td>
+<td>修按键映射、电源菜单、定时关机、画面校正</td>
+<td>逐个在真机上验证</td>
+</tr>
+<tr>
+<td>10-18 上午</td>
+<td>死磕自动对焦</td>
+<td>字节级还原原版命令，投影仪仍回”未知错误”，暂时放弃</td>
+</tr>
+<tr>
+<td>10-18 上午</td>
+<td>出 release 包</td>
+<td>15.2MB → 7.0MB</td>
+</tr>
+</tbody></table>
+<h2 id="四、REA-实际用上了多少"><a href="#四、REA-实际用上了多少" class="headerlink" title="四、REA 实际用上了多少"></a>四、REA 实际用上了多少</h2><p>先说结论：<strong>REA 暴露了 207 个工具，整个项目里实际只调用了 1 次，而且失败了。</strong></p>
+<h3 id="4-1-第一个坑：装完了，但当前会话里没有"><a href="#4-1-第一个坑：装完了，但当前会话里没有" class="headerlink" title="4.1 第一个坑：装完了，但当前会话里没有"></a>4.1 第一个坑：装完了，但当前会话里没有</h3><p><code>npx rea-agents setup</code> 之后，在同一个 Claude Code 会话里直接开始分析。<code>rea-agents doctor</code> 报告注册状态健康，但当前会话里并没有 REA 的工具——MCP server 是在会话启动时加载的，装完需要<strong>重启 agent</strong> 才会出现。这一点 REA 的文档里写了，doctor 也明确提示”注册正常不代表当前会话已连接”，但第一次用很容易忽略。</p>
+<h3 id="4-2-第二个坑：Android-分析要自备-JADX"><a href="#4-2-第二个坑：Android-分析要自备-JADX" class="headerlink" title="4.2 第二个坑：Android 分析要自备 JADX"></a>4.2 第二个坑：Android 分析要自备 JADX</h3><p>后来工具加载进来了，我调用了 <code>inspect_android_package</code> 分析 APK，返回：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">capability_unavailable / unsupported_provider:</span><br><span class="line">Set REA_JADX_MCP_JAR to the absolute path of a caller-supplied</span><br><span class="line">jadx-headless-mcp 0.7.1 JAR. REA does not download or install it.</span><br></pre></td></tr></table></figure>
+
+<p>REA 的 Android 能力依赖一个<strong>需要用户自己准备</strong>的 <code>jadx-headless-mcp</code> JAR，REA 明确不负责下载和安装任何分析引擎（Ghidra、IDA、JADX、Binwalk 都是如此）。这是有意的设计——不替用户往机器上装东西、版本由用户掌控——但对”想快速试一下”的人来说，门槛就在这里。</p>
+<h3 id="4-3-第三个坑：公司网络"><a href="#4-3-第三个坑：公司网络" class="headerlink" title="4.3 第三个坑：公司网络"></a>4.3 第三个坑：公司网络</h3><p>想顺手装个 JADX，结果 GitHub API 返回空响应（公司网络拦了 <code>api.github.com</code>，下载域名倒是通的）；后面构建 Flutter 时，Google Maven 也被拦了。在受限网络下，”自备引擎”这件事的成本会被放大。</p>
+<h3 id="4-4-退回经典工具链"><a href="#4-4-退回经典工具链" class="headerlink" title="4.4 退回经典工具链"></a>4.4 退回经典工具链</h3><p>机器上正好有一个现成的 <code>apktool.jar</code>，于是整个静态分析就变成了最朴素的组合：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">java -jar apktool.jar d -r -f -o apktool_out jm.apk   <span class="comment"># 只反编译代码，跳过资源</span></span><br><span class="line">grep -rn <span class="string">&quot;0xe04a&quot;</span> apktool_out/smali_classes3/...        <span class="comment"># 然后就是大量的 grep + 读 smali</span></span><br></pre></td></tr></table></figure>
+
+<p>Windows 的 Git Bash 里连 <code>strings</code> 都没有，看二进制 Manifest 的字符串池就用 <code>tr -d &#39;\000&#39; | grep -aoE ...</code> 凑合。</p>
+<p>说实话，对这个 APK 来说，apktool + grep 已经够用了：它<strong>没有加固、没有原生壳、没有插件化</strong>，6 个 dex 反编译出来就是可读的 smali，类名方法名都没混淆。真正的难点不在”读代码”，而在”读对代码”——下一节的坑几乎都是这一类。</p>
+<h2 id="五、静态分析的坑，以及怎么解决的"><a href="#五、静态分析的坑，以及怎么解决的" class="headerlink" title="五、静态分析的坑，以及怎么解决的"></a>五、静态分析的坑，以及怎么解决的</h2><h3 id="5-1-鉴权架构：结论是对的"><a href="#5-1-鉴权架构：结论是对的" class="headerlink" title="5.1 鉴权架构：结论是对的"></a>5.1 鉴权架构：结论是对的</h3><p>先说一个做对了的判断。通过读 <code>ConnectParameter</code>、<code>AuthCode</code>、<code>VcontrolCmd</code> 这几个类：</p>
+<ul>
+<li>连接参数是 <code>ip + port + phoneName + phoneUid + authCode + timeout</code>，<strong>没有账号 token</strong>；</li>
+<li><code>AuthCode</code> 是<strong>投影仪本地配对</strong>的模型：无需授权 &#x2F; 弹窗确认 &#x2F; 输入投影仪上显示的验证码 &#x2F; 永久信任；</li>
+<li>没有全局登录拦截器，登录只是个别功能入口里的软判断。</li>
+</ul>
+<p>所以”遥控不需要登录”这个直觉是对的。后来真机验证：连上 TCP 发一个连接命令，投影仪直接回设备信息，<strong>连验证码都没要</strong>。</p>
+<h3 id="5-2-改包免登录：卡在云端绑定"><a href="#5-2-改包免登录：卡在云端绑定" class="headerlink" title="5.2 改包免登录：卡在云端绑定"></a>5.2 改包免登录：卡在云端绑定</h3><p>既然遥控不依赖登录，最初尝试的是改极米助手本身：跳过登录、直达遥控页，改包名以便和原版共存。改包本身没问题（无加固、可重签），但在”添加设备”这一步卡住了——<strong>设备列表来自账号下的云端绑定</strong>，不登录就拿不到设备，局域网直连的入口又藏在这个流程后面。继续改下去等于要重写它的设备管理，于是放弃，转向自己写独立遥控器。</p>
+<h3 id="5-3-端口-57418：把魔数当成了端口"><a href="#5-3-端口-57418：把魔数当成了端口" class="headerlink" title="5.3 端口 57418：把魔数当成了端口"></a>5.3 端口 57418：把魔数当成了端口</h3><p>第一版遥控器连接投影仪，直接 <code>errno 111 ECONNREFUSED</code>。</p>
+<p>回头查，当初在 <code>ProtocolHeader</code> 里看到 <code>magicNumber = 0xe04a</code>，换算成十进制 57418，就当成了端口——<strong>它其实是帧头的魔数</strong>。真正的端口在 <code>ConnectManagerV2</code> 里：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">REMOTE_TCP_PORT = 0x3359  →  13145</span><br></pre></td></tr></table></figure>
+
+<p>这个错误在纯静态阶段完全发现不了，因为代码里两处都”讲得通”。最后是靠远程上真机全端口扫描、再回源码比对才定位的。</p>
+<h3 id="5-4-帧格式：收发魔数不对称"><a href="#5-4-帧格式：收发魔数不对称" class="headerlink" title="5.4 帧格式：收发魔数不对称"></a>5.4 帧格式：收发魔数不对称</h3><p>协议本身很简单：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">[magic 4 字节][body 长度 4 字节][UTF-8 JSON]，大端</span><br></pre></td></tr></table></figure>
+
+<p>但最初写的发送魔数是 <code>FF FF E0 4A</code>，抓到的实际是：<strong>发送用 <code>00 00 E0 4A</code>，投影仪回包用 <code>FF FF E0 4A</code></strong>。解析时只认低 16 位 <code>E04A</code> 就行了。</p>
+<h3 id="5-5-按键码：常量名会骗人"><a href="#5-5-按键码：常量名会骗人" class="headerlink" title="5.5 按键码：常量名会骗人"></a>5.5 按键码：常量名会骗人</h3><p>按键命令是 <code>{&quot;action&quot;:50036,&quot;commonCmd&quot;:{&quot;type&quot;:&quot;inst&quot;,&quot;action&quot;:&quot;1/2&quot;,&quot;code&quot;:&quot;N&quot;}}</code>，1 按下、2 抬起。第一版真机测试时用户反馈：</p>
+<ul>
+<li>点「电源」弹出的是快捷菜单；</li>
+<li>点「静音」弹出的是关机菜单；</li>
+<li>点「菜单」弹出的是导航栏编辑菜单。</li>
+</ul>
+<p>原因是部分按键码在 smali 里是通过寄存器传进来的，静态抽取时对错了号。重新从 <code>GMKeyTcpCommandFactory</code> 逐个核对后：<code>11</code> 是关机菜单，<code>12</code> 是全部设置（快捷菜单），<code>13</code> 是立即关机，极米根本没有独立的静音键。</p>
+<h3 id="5-6-定时关机：传的是档位，不是时长"><a href="#5-6-定时关机：传的是档位，不是时长" class="headerlink" title="5.6 定时关机：传的是档位，不是时长"></a>5.6 定时关机：传的是档位，不是时长</h3><p>定时关机命令里有个 <code>time</code> 字段，第一反应传分钟数（15、30……），结果不管选多久，投影仪都提示”成功取消定时关机”。改成秒数还是一样。</p>
+<p>最后在 UI 层的 <code>PowerMenuDialog</code> 里找到一句：</p>
+<figure class="highlight smali"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">add-int/lit8 p3, p3, -0x2      <span class="comment"># 列表位置减 2</span><span class="built_in"></span></span><br><span class="line"><span class="built_in">invoke-virtual </span>&#123;...&#125;, timingShutdown(I...)</span><br></pre></td></tr></table></figure>
+
+<p><strong><code>time</code> 传的是档位编号</strong>：0 取消、1 &#x3D; 15 分钟、2 &#x3D; 30 分钟、3 &#x3D; 1 小时、4 &#x3D; 2 小时。只看协议层的方法签名 <code>sendPowerOffDelay(int)</code>，永远猜不到这一点，必须追到调用它的界面代码。</p>
+<h3 id="5-7-画面校正：找对入口"><a href="#5-7-画面校正：找对入口" class="headerlink" title="5.7 画面校正：找对入口"></a>5.7 画面校正：找对入口</h3><p>源码里叫”梯形校正”的方法不止一个。一开始用的是 <code>openTrapezoidalCorrectionUi</code>（action 45000），投影仪回 <code>state:1</code> 表示成功，但画面上什么都没发生。</p>
+<p>后来顺着原版”工具”页面的点击逻辑往下追，发现画面校正走的是 <code>ToolManager.sendAutoKstSystemDevice</code> → <code>sendCommonCmd(50028)</code>，命令是一个几乎空的 JSON：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span><span class="attr">&quot;action&quot;</span><span class="punctuation">:</span><span class="number">50028</span><span class="punctuation">,</span><span class="attr">&quot;msgid&quot;</span><span class="punctuation">:</span><span class="string">&quot;70002&quot;</span><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>发出去之后，投影仪先打一片白光，然后画面从梯形调整回矩形——和原版一模一样。<strong>教训：协议层有很多”能用”的方法，要以 UI 实际调用的那条为准。</strong></p>
+<h3 id="5-8-自动对焦：还原到字节级，依然失败"><a href="#5-8-自动对焦：还原到字节级，依然失败" class="headerlink" title="5.8 自动对焦：还原到字节级，依然失败"></a>5.8 自动对焦：还原到字节级，依然失败</h3><p>这是唯一没解决的功能，也最能说明静态分析的天花板。</p>
+<p>原版点「自动对焦」，代码路径很清楚：<code>ToolsManager.open(&quot;auto_focus&quot;)</code> → <code>ToolManager.autoFocus()</code> → <code>DeviceProxy.openAutoFocus()</code> → 发 <code>{&quot;action&quot;:45984, &quot;controlCmd&quot;:{&quot;mode&quot;:32,...}, &quot;msgid&quot;:&quot;2&quot;}</code>。主页快捷工具和遥控器「更多」里的入口最终都汇到这一条。</p>
+<p>但我们发同样的命令，投影仪总是回：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span><span class="attr">&quot;action&quot;</span><span class="punctuation">:</span><span class="number">45985</span><span class="punctuation">,</span><span class="attr">&quot;extraInfo&quot;</span><span class="punctuation">:</span><span class="punctuation">&#123;</span><span class="attr">&quot;message&quot;</span><span class="punctuation">:</span><span class="string">&quot;未知错误&quot;</span><span class="punctuation">&#125;</span><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>依次排除的可能：</p>
+<table>
+<thead>
+<tr>
+<th>假设</th>
+<th>验证方法</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>握手不完整，投影仪不认这个控制端</td>
+<td>按原版补全 <code>authCode</code> 的全部字段（<code>authState</code>&#x2F;<code>ip</code>&#x2F;<code>phoneName</code>&#x2F;<code>phoneUid</code>&#x2F;<code>timeOut</code>）</td>
+<td>仍然失败</td>
+</tr>
+<tr>
+<td>JSON 字段不一致</td>
+<td>发现原版的 <code>GsonUtils</code> 开了 <code>serializeNulls()</code>，按字段声明顺序把所有 null 字段都补上，逐字节还原</td>
+<td>仍然失败</td>
+</tr>
+<tr>
+<td>两个控制端冲突</td>
+<td>强制停掉手机上的原版再发</td>
+<td>仍然失败</td>
+</tr>
+<tr>
+<td>机器不支持</td>
+<td>查投影仪上报的功能列表（action 50022）</td>
+<td>明确声明支持 <code>autoFocus</code></td>
+</tr>
+<tr>
+<td>走了别的通道</td>
+<td>查蓝牙（只用于唤醒和配网）、查 Pandora 容器、查 F1 键</td>
+<td>都不是</td>
+</tr>
+<tr>
+<td>抓原版的实际流量</td>
+<td>手机 logcat、原版自己的日志文件</td>
+<td>原版不记录这条命令，抓不到</td>
+</tr>
+</tbody></table>
+<p>还有个意外发现：有一次测试脚本的引号被 PowerShell 吞掉，发出去的 JSON 格式根本不合法，投影仪回的也是同样的”未知错误”，说明它只是按 action 找到处理函数，然后在投影仪内部执行失败了。剩下的可能藏在投影仪端（比如对焦服务要求某种前置状态），或者原版在点击前后做了某件日志里看不到的事。要继续查，就得对原版做运行时插桩（Frida 之类），成本和收益已经不成比例，于是先隐藏了这个功能。</p>
+<h2 id="六、真机验证：真正起决定作用的环节"><a href="#六、真机验证：真正起决定作用的环节" class="headerlink" title="六、真机验证：真正起决定作用的环节"></a>六、真机验证：真正起决定作用的环节</h2><p>回头看，<strong>解决问题的从来不是”读得更仔细”，而是”在真机上发一条命令看看”</strong>。端口、魔数、按键码、定时关机、画面校正，全都是真机一测就露馅，改完再测就确认。</p>
+<p>问题是投影仪不在我手边。这里用上了我自己写的 <a href="/2026/10/17/remote-assist-tool-ai-agent-remote-debug/">remote-assist-tool</a>：家里电脑跑一下 <code>share</code>，把协助码发给 Claude Code，它就能在那台电脑上：</p>
+<ul>
+<li>扫描投影仪端口、用 PowerShell 写个小脚本直接发协议帧并打印回包；</li>
+<li>通过电脑上的 adb 给手机装包、截屏、抓 logcat；</li>
+<li>我在投影仪前面看效果，口头反馈”有了 &#x2F; 没反应”。</li>
+</ul>
+<p>中间还形成了一条很重要的工作约定，是我在过程中明确提出来的：<strong>先用脚本直接发命令，在真机上确认有效，再改 App、打包让我测</strong>。早期几轮是”改代码 → 打包 → 装手机 → 我测 → 不行再改”，一轮十几分钟，而且每次都是拿未验证的猜测让人测。改成先发命令之后，一条命令几秒钟就能知道对不对。</p>
+<p>另一个经验是：<strong>测试脚本要保持连接</strong>。早期的脚本发完命令立刻断开，有些需要投影仪弹界面的命令就看不出效果；改成发完再等几秒、把这段时间的回包都收下来，判断准确了很多。</p>
+<h2 id="七、构建和打包的小坑"><a href="#七、构建和打包的小坑" class="headerlink" title="七、构建和打包的小坑"></a>七、构建和打包的小坑</h2><ul>
+<li><strong>公司网络拦截 Google Maven</strong>：Gradle 解析 Android Gradle Plugin 失败。把 Flutter 的 Gradle 设置和项目仓库统一指到阿里云镜像后解决。中间尝试过改成 <code>buildscript classpath</code> 的老式写法，结果 Kotlin 插件出现类加载器分裂的报错，又改了回来。</li>
+<li><strong>包体积</strong>：debug 包 181MB，第一版 release 包 15.2MB。用 <code>unzip -lv</code> 一看，<code>libflutter.so</code> 和 <code>libapp.so</code> 是以 Stored（不压缩）方式放进 APK 的，两个加起来 15.4MB。加上 <code>packaging.jniLibs.useLegacyPackaging = true</code> 让原生库压缩存储，再开 R8 和资源压缩、去掉没用到的 <code>cupertino_icons</code>，最后 <strong>7.0MB</strong>。代价是安装后原生库要解压，占用的存储空间会多一些。</li>
+<li><strong>小米手机 USB 安装</strong>：会被系统拦截（<code>INSTALL_FAILED_USER_RESTRICTED</code>），需要在手机上手动确认；网络 adb 偶尔 <code>device offline</code>，断开重连即可。</li>
+</ul>
+<h2 id="八、REA-的评价与局限"><a href="#八、REA-的评价与局限" class="headerlink" title="八、REA 的评价与局限"></a>八、REA 的评价与局限</h2><p>在这次的体验基础上，说说我对 REA 的看法。需要先声明：<strong>它的核心能力我基本没用上</strong>，所以下面更多是”上手门槛”层面的感受，而不是对它分析能力的评测。</p>
+<h3 id="做得好的"><a href="#做得好的" class="headerlink" title="做得好的"></a>做得好的</h3><ul>
+<li><strong>诊断很准</strong>：<code>doctor</code> 准确区分了”注册正常”和”当前会话已连接”，报错也直接给出缺什么、怎么补，没有含糊；</li>
+<li><strong>skill 写得很有章法</strong>：先按目标类型选工具、先摘要再深入、区分观察与推断、把目标内容当不可信数据——即使最后没用 REA，这套方法论对 AI 做逆向也有指导意义；</li>
+<li><strong>不擅自装东西</strong>：所有分析引擎都由用户自备，版本可控。在企业环境里这其实是优点。</li>
+</ul>
+<h3 id="局限"><a href="#局限" class="headerlink" title="局限"></a>局限</h3><ul>
+<li><strong>“自备引擎”的门槛</strong>：Android 要 JADX MCP JAR，原生二进制要 Ghidra&#x2F;IDA&#x2F;Hopper，固件要 Binwalk&#x2F;Unblob。工具清单里能看到 207 个能力，但开箱即用的只是一小部分；</li>
+<li><strong>受限网络下成本更高</strong>：本来下载一个 JAR 的事，在公司网络里就要绕路；</li>
+<li><strong>工具数量带来的上下文开销</strong>：207 个工具的定义本身就很长，每次对话都要带上，会占用相当一部分上下文；</li>
+<li><strong>静态分析解决不了运行时问题</strong>：这次真正卡住的地方（端口、档位、自动对焦）都需要真机验证。REA 也有 adb、Frida 等运行时能力，但前提是 agent 能直接接触到设备——而我的设备不在手边，最后靠的是另一个工具；</li>
+<li><strong>对”简单目标”有点重</strong>：对一个没加固、没混淆的 APK，apktool + grep 足够了。REA 的价值大概在更复杂的场景：加固、混淆、原生代码、需要证据链和多次分析结果对比的时候。</li>
+</ul>
+<h3 id="也说说-AI-本身的局限"><a href="#也说说-AI-本身的局限" class="headerlink" title="也说说 AI 本身的局限"></a>也说说 AI 本身的局限</h3><ul>
+<li><strong>静态分析时很自信，但错了好几次</strong>：端口、魔数、按键码、定时关机参数，静态结论都”讲得通”，但都错了。AI 读代码的速度很快，但”读对”仍然要靠真机验证兜底；</li>
+<li><strong>会话中断</strong>：安全分类器拦截了两次回复（第一次就发生在刚提出”去掉登录”这个需求的时候，之后 AI 把方向调整为分析鉴权架构、做局域网互操作，才继续下去），还有上下文压缩、输出长度超限。长任务里这些中断会打断节奏，需要靠阶段性总结和笔记文件来接续；</li>
+<li><strong>需要人类做眼睛</strong>：投影仪上有没有出现白光、对焦动画，只有人在现场才看得到。</li>
+</ul>
+<h2 id="九、结语"><a href="#九、结语" class="headerlink" title="九、结语"></a>九、结语</h2><p>这次实验的标题本来应该是”用 REA 逆向极米助手”，最后变成了”在 REA 的指导思想下，用 apktool、grep、PowerShell 和一个远程协助工具，把协议一点点试出来”。</p>
+<p>REA 的理念是对的：逆向要讲证据，要区分观察和推断，要对目标内容保持警惕。但它现阶段更像一个需要用户自己配齐引擎的”框架”，而不是开箱即用的”工具”。下次遇到加固或原生代码的目标，我会提前把 JADX 和 Ghidra 配好，再给它一次机会。</p>
+<p>至于这个遥控器——除了自动对焦，日常用已经够了。不用登录，不用等 208MB 的 App 启动，打开就是遥控器，这就是我想要的。</p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a href="https://kegechen.github.io">Mike</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://kegechen.github.io/2026/10/18/rea-xgimi-projector-lan-remote/">https://kegechen.github.io/2026/10/18/rea-xgimi-projector-lan-remote/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://kegechen.github.io" target="_blank">Mike's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/REA/">REA</a><a class="post-meta__tags" href="/tags/%E9%80%86%E5%90%91%E5%B7%A5%E7%A8%8B/">逆向工程</a><a class="post-meta__tags" href="/tags/Android/">Android</a><a class="post-meta__tags" href="/tags/Claude-Code/">Claude Code</a><a class="post-meta__tags" href="/tags/MCP/">MCP</a><a class="post-meta__tags" href="/tags/Flutter/">Flutter</a><a class="post-meta__tags" href="/tags/%E6%8A%95%E5%BD%B1%E4%BB%AA/">投影仪</a></div><div class="post-share"><div class="social-share" data-image="https://github.com/kegechen.png" data-sites="facebook,x,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related full-width" href="/2026/10/17/remote-assist-tool-ai-agent-remote-debug/" title="不装 SSH，让 AI agent 直接上手调试远端机器：remote-assist-tool 半年开发记"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">下一篇</div><div class="info-item-2">不装 SSH，让 AI agent 直接上手调试远端机器：remote-assist-tool 半年开发记</div></div><div class="info-2"><div class="info-item-1"> 远端是一台 Windows（或 Linux），藏在 NAT 后面，没开 SSH，也不想为它开 SSH。我想要的是：对方跑一条命令，把屏幕上那段话复制给我本地的 AI 助手——Claude Code、Codex、豆包都行，只要支持 MCP——它就能在那台机器上执行命令、读写文件、翻日志、传安装包。 从 2026 年 3 月到 10 月，这个想法长成了 remote-assist-tool：177 个提交、约 5.4 万行 Go（其中测试 1.7 万行）。本文按时间线讲它想解决什么、中间踩过哪些坑、为什么改成现在这样，以及它能做什么、做不到什么。    一、要解决的问题1.1 场景我日常要协助排查的机器大致有三类：  同事或现场的 Windows 电脑：装了一堆业务软件，出问题时要看日志、查进程、替换个 DLL； 局域网里的 Linux &#x2F; ARM64 小机器：开发板、测试机； 跨网络的机器：在别人的 NAT 后面，没有公网 IP。  传统做法是远程桌面（向日葵、TeamViewer、RDP）加人肉操作。2026 年我的工作方式已经变成”大部分排查让 AI agent 动...</div></div></div></a></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><a class="pagination-related" href="/2026/10/17/remote-assist-tool-ai-agent-remote-debug/" title="不装 SSH，让 AI agent 直接上手调试远端机器：remote-assist-tool 半年开发记"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-10-17</div><div class="info-item-2">不装 SSH，让 AI agent 直接上手调试远端机器：remote-assist-tool 半年开发记</div></div><div class="info-2"><div class="info-item-1"> 远端是一台 Windows（或 Linux），藏在 NAT 后面，没开 SSH，也不想为它开 SSH。我想要的是：对方跑一条命令，把屏幕上那段话复制给我本地的 AI 助手——Claude Code、Codex、豆包都行，只要支持 MCP——它就能在那台机器上执行命令、读写文件、翻日志、传安装包。 从 2026 年 3 月到 10 月，这个想法长成了 remote-assist-tool：177 个提交、约 5.4 万行 Go（其中测试 1.7 万行）。本文按时间线讲它想解决什么、中间踩过哪些坑、为什么改成现在这样，以及它能做什么、做不到什么。    一、要解决的问题1.1 场景我日常要协助排查的机器大致有三类：  同事或现场的 Windows 电脑：装了一堆业务软件，出问题时要看日志、查进程、替换个 DLL； 局域网里的 Linux &#x2F; ARM64 小机器：开发板、测试机； 跨网络的机器：在别人的 NAT 后面，没有公网 IP。  传统做法是远程桌面（向日葵、TeamViewer、RDP）加人肉操作。2026 年我的工作方式已经变成”大部分排查让 AI agent 动...</div></div></div></a></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="https://github.com/kegechen.png" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">Mike</div><div class="author-info-description">记录工作技术笔记和个人生活点滴</div><div class="site-data"><a href="/archives/"><div class="headline">文章</div><div class="length-num">6</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">33</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/kegechen"><i class="fab fa-github"></i><span>Github</span></a></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">欢迎来到我的博客！</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%80%E3%80%81%E8%B5%B7%E5%9B%A0%E5%92%8C%E7%9B%AE%E6%A0%87"><span class="toc-number">1.</span> <span class="toc-text">一、起因和目标</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%8C%E3%80%81REA-%E6%98%AF%E4%BB%80%E4%B9%88"><span class="toc-number">2.</span> <span class="toc-text">二、REA 是什么</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%89%E3%80%81%E6%97%B6%E9%97%B4%E7%BA%BF"><span class="toc-number">3.</span> <span class="toc-text">三、时间线</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%9B%9B%E3%80%81REA-%E5%AE%9E%E9%99%85%E7%94%A8%E4%B8%8A%E4%BA%86%E5%A4%9A%E5%B0%91"><span class="toc-number">4.</span> <span class="toc-text">四、REA 实际用上了多少</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#4-1-%E7%AC%AC%E4%B8%80%E4%B8%AA%E5%9D%91%EF%BC%9A%E8%A3%85%E5%AE%8C%E4%BA%86%EF%BC%8C%E4%BD%86%E5%BD%93%E5%89%8D%E4%BC%9A%E8%AF%9D%E9%87%8C%E6%B2%A1%E6%9C%89"><span class="toc-number">4.1.</span> <span class="toc-text">4.1 第一个坑：装完了，但当前会话里没有</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-2-%E7%AC%AC%E4%BA%8C%E4%B8%AA%E5%9D%91%EF%BC%9AAndroid-%E5%88%86%E6%9E%90%E8%A6%81%E8%87%AA%E5%A4%87-JADX"><span class="toc-number">4.2.</span> <span class="toc-text">4.2 第二个坑：Android 分析要自备 JADX</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-3-%E7%AC%AC%E4%B8%89%E4%B8%AA%E5%9D%91%EF%BC%9A%E5%85%AC%E5%8F%B8%E7%BD%91%E7%BB%9C"><span class="toc-number">4.3.</span> <span class="toc-text">4.3 第三个坑：公司网络</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-4-%E9%80%80%E5%9B%9E%E7%BB%8F%E5%85%B8%E5%B7%A5%E5%85%B7%E9%93%BE"><span class="toc-number">4.4.</span> <span class="toc-text">4.4 退回经典工具链</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%94%E3%80%81%E9%9D%99%E6%80%81%E5%88%86%E6%9E%90%E7%9A%84%E5%9D%91%EF%BC%8C%E4%BB%A5%E5%8F%8A%E6%80%8E%E4%B9%88%E8%A7%A3%E5%86%B3%E7%9A%84"><span class="toc-number">5.</span> <span class="toc-text">五、静态分析的坑，以及怎么解决的</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#5-1-%E9%89%B4%E6%9D%83%E6%9E%B6%E6%9E%84%EF%BC%9A%E7%BB%93%E8%AE%BA%E6%98%AF%E5%AF%B9%E7%9A%84"><span class="toc-number">5.1.</span> <span class="toc-text">5.1 鉴权架构：结论是对的</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-2-%E6%94%B9%E5%8C%85%E5%85%8D%E7%99%BB%E5%BD%95%EF%BC%9A%E5%8D%A1%E5%9C%A8%E4%BA%91%E7%AB%AF%E7%BB%91%E5%AE%9A"><span class="toc-number">5.2.</span> <span class="toc-text">5.2 改包免登录：卡在云端绑定</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-3-%E7%AB%AF%E5%8F%A3-57418%EF%BC%9A%E6%8A%8A%E9%AD%94%E6%95%B0%E5%BD%93%E6%88%90%E4%BA%86%E7%AB%AF%E5%8F%A3"><span class="toc-number">5.3.</span> <span class="toc-text">5.3 端口 57418：把魔数当成了端口</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-4-%E5%B8%A7%E6%A0%BC%E5%BC%8F%EF%BC%9A%E6%94%B6%E5%8F%91%E9%AD%94%E6%95%B0%E4%B8%8D%E5%AF%B9%E7%A7%B0"><span class="toc-number">5.4.</span> <span class="toc-text">5.4 帧格式：收发魔数不对称</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-5-%E6%8C%89%E9%94%AE%E7%A0%81%EF%BC%9A%E5%B8%B8%E9%87%8F%E5%90%8D%E4%BC%9A%E9%AA%97%E4%BA%BA"><span class="toc-number">5.5.</span> <span class="toc-text">5.5 按键码：常量名会骗人</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-6-%E5%AE%9A%E6%97%B6%E5%85%B3%E6%9C%BA%EF%BC%9A%E4%BC%A0%E7%9A%84%E6%98%AF%E6%A1%A3%E4%BD%8D%EF%BC%8C%E4%B8%8D%E6%98%AF%E6%97%B6%E9%95%BF"><span class="toc-number">5.6.</span> <span class="toc-text">5.6 定时关机：传的是档位，不是时长</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-7-%E7%94%BB%E9%9D%A2%E6%A0%A1%E6%AD%A3%EF%BC%9A%E6%89%BE%E5%AF%B9%E5%85%A5%E5%8F%A3"><span class="toc-number">5.7.</span> <span class="toc-text">5.7 画面校正：找对入口</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-8-%E8%87%AA%E5%8A%A8%E5%AF%B9%E7%84%A6%EF%BC%9A%E8%BF%98%E5%8E%9F%E5%88%B0%E5%AD%97%E8%8A%82%E7%BA%A7%EF%BC%8C%E4%BE%9D%E7%84%B6%E5%A4%B1%E8%B4%A5"><span class="toc-number">5.8.</span> <span class="toc-text">5.8 自动对焦：还原到字节级，依然失败</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%AD%E3%80%81%E7%9C%9F%E6%9C%BA%E9%AA%8C%E8%AF%81%EF%BC%9A%E7%9C%9F%E6%AD%A3%E8%B5%B7%E5%86%B3%E5%AE%9A%E4%BD%9C%E7%94%A8%E7%9A%84%E7%8E%AF%E8%8A%82"><span class="toc-number">6.</span> <span class="toc-text">六、真机验证：真正起决定作用的环节</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%83%E3%80%81%E6%9E%84%E5%BB%BA%E5%92%8C%E6%89%93%E5%8C%85%E7%9A%84%E5%B0%8F%E5%9D%91"><span class="toc-number">7.</span> <span class="toc-text">七、构建和打包的小坑</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%AB%E3%80%81REA-%E7%9A%84%E8%AF%84%E4%BB%B7%E4%B8%8E%E5%B1%80%E9%99%90"><span class="toc-number">8.</span> <span class="toc-text">八、REA 的评价与局限</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%81%9A%E5%BE%97%E5%A5%BD%E7%9A%84"><span class="toc-number">8.1.</span> <span class="toc-text">做得好的</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%B1%80%E9%99%90"><span class="toc-number">8.2.</span> <span class="toc-text">局限</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B9%9F%E8%AF%B4%E8%AF%B4-AI-%E6%9C%AC%E8%BA%AB%E7%9A%84%E5%B1%80%E9%99%90"><span class="toc-number">8.3.</span> <span class="toc-text">也说说 AI 本身的局限</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B9%9D%E3%80%81%E7%BB%93%E8%AF%AD"><span class="toc-number">9.</span> <span class="toc-text">九、结语</span></a></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/10/18/rea-xgimi-projector-lan-remote/" title="用 AI + REA 逆向极米投影仪的局域网遥控协议：过程、踩坑与工具的局限">用 AI + REA 逆向极米投影仪的局域网遥控协议：过程、踩坑与工具的局限</a><time datetime="2026-10-18T05:00:00.000Z" title="发表于 2026-10-18 13:00:00">2026-10-18</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/10/17/remote-assist-tool-ai-agent-remote-debug/" title="不装 SSH，让 AI agent 直接上手调试远端机器：remote-assist-tool 半年开发记">不装 SSH，让 AI agent 直接上手调试远端机器：remote-assist-tool 半年开发记</a><time datetime="2026-10-17T14:30:00.000Z" title="发表于 2026-10-17 22:30:00">2026-10-17</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/05/07/lan-mouse-dde-kwin-uinput-stickycorners/" title="给 lan-mouse 加上 uinput 后端 + Win11 风格越界停留：dde-kwin Wayland 下的软 KVM 折腾记">给 lan-mouse 加上 uinput 后端 + Win11 风格越界停留：dde-kwin Wayland 下的软 KVM 折腾记</a><time datetime="2026-05-07T08:00:00.000Z" title="发表于 2026-05-07 16:00:00">2026-05-07</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/03/19/cf-workers-vless-debug/" title="Cloudflare Workers 部署 VLESS 代理：从 522 报错到发现 CF 关键字扫描机制的完整调试记录">Cloudflare Workers 部署 VLESS 代理：从 522 报错到发现 CF 关键字扫描机制的完整调试记录</a><time datetime="2026-03-19T10:12:00.000Z" title="发表于 2026-03-19 18:12:00">2026-03-19</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/02/25/claude-openclaw-guide/" title="Claude Code &amp;&amp; OpenClaw 初体验">Claude Code &amp;&amp; OpenClaw 初体验</a><time datetime="2026-02-25T11:30:00.000Z" title="发表于 2026-02-25 19:30:00">2026-02-25</time></div></div></div></div></div></div></main><footer id="footer"><div class="footer-other"><div class="footer-copyright"><span class="copyright">&copy;&nbsp;2025 - 2026 By Mike</span><span class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo 8.1.1</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly 5.5.4</a></span></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js?v=5.5.4"></script><script src="/js/main.js?v=5.5.4"></script><div class="js-pjax"></div><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>
